@@ -79,15 +79,15 @@
       this.load.spritesheet('ai' + n + '-idle', A + 'ai/' + n + '_idle.png', { frameWidth: 92, frameHeight: 92 });
       this.load.spritesheet('ai' + n + '-walk', A + 'ai/' + n + '_walk.png', { frameWidth: 92, frameHeight: 92 });
     }
-    // camadas LPC (64px por frame)
+    // camadas LPC upscaladas 2x via Scale2x (128px por frame; render a 0.8x = menos pixelado)
     for (const c of [...CLOTH, ...Object.values(TORSOS)]) {
       for (const anim of ['walk', 'slash', 'thrust']) {
-        this.load.spritesheet(`${c}-${anim}`, `${A}lpc/${c}/${anim}.png`, { frameWidth: 64, frameHeight: 64 });
+        this.load.spritesheet(`${c}-${anim}`, `${A}lpc2x/${c}/${anim}.png`, { frameWidth: 128, frameHeight: 128 });
       }
     }
     for (const [w, files] of Object.entries(WEAPON_FILES)) {
       for (const [anim, , fs] of files) {
-        this.load.spritesheet(`w-${w}-${anim}`, `${A}lpc/weapon_${w}/${anim}.png`, { frameWidth: fs, frameHeight: fs });
+        this.load.spritesheet(`w-${w}-${anim}`, `${A}lpc2x/weapon_${w}/${anim}.png`, { frameWidth: fs * 2, frameHeight: fs * 2 });
       }
     }
     for (const [, dir, idle, fw, fh, walk] of MOBS) {
@@ -278,7 +278,7 @@
     // ------- player paper doll -------
     const P = this.P = { skin: 'lpc', armor: 'leather', weapon: 'longsword', dir: 's', attacking: false };
     const doll = this.add.container(0, 0);
-    const mkLayer = () => this.add.sprite(0, 24, 'body-walk', 2 * 9).setScale(SCALE.player);
+    const mkLayer = () => this.add.sprite(0, 24, 'body-walk', 2 * 9).setScale(SCALE.player / 2);
     const layers = this.layers = {
       wb: mkLayer(), body: mkLayer(), feet: mkLayer(), legs: mkLayer(),
       torso: mkLayer(), head: mkLayer(), hair: mkLayer(), wf: mkLayer(),
@@ -298,8 +298,8 @@
       return `${layer}-${anim}`;
     };
     const applyOrigin = (spr) => {
-      const big = spr.frame.width === 192;
-      spr.setOrigin(0.5, big ? (0.95 * 64 + 64) / 192 : 0.95);
+      const big = spr.frame.width === 384; // sheets de ataque oversized (192→384 no 2x)
+      spr.setOrigin(0.5, big ? (0.95 + 1) / 3 : 0.95);
     };
     const ensureAnim = (tex, anim, row) => {
       const key = `${tex}|${row}`;
