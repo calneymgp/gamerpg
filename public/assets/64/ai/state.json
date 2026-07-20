@@ -1,0 +1,34 @@
+{
+ "tileset": {
+  "key": "Denis",
+  "id": "b74e3e97-78ec-4a9d-b3d9-6df0c4a1e6db"
+ },
+ "tree": {
+  "key": "Yure",
+  "id": "ff02a3b4-6a9d-4d58-9008-c53dd68b4a91"
+ },
+ "char_hero": {
+  "key": "Lock",
+  "character_id": "42893be3-b205-4b35-8f15-d6baf1a02076",
+  "job_id": null,
+  "walk_requested": true
+ },
+ "char_yeti": {
+  "key": "fuuma",
+  "character_id": "d7166566-1363-42e6-bc55-ae231ab11390",
+  "job_id": null,
+  "walk_requested": true
+ },
+ "char_golem": {
+  "key": "Archangel",
+  "character_id": "00205337-f4a1-48e5-82d0-5902a11b8b5f",
+  "job_id": null,
+  "walk_requested": true
+ },
+ "char_wolf": {
+  "key": "Yure",
+  "character_id": "d54bcd9d-36ea-4de2-8abc-a98c6d51934e",
+  "job_id": null,
+  "walk_requested": true
+ }
+}

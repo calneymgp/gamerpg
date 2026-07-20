@@ -1,3 +1,6 @@
 /assets/
 *.log
 nohup.out
+.env
+.ai_raw/
+.playwright-mcp/

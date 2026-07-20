@@ -70,6 +70,23 @@ assets/            → downloads brutos (zips, BMPs Reiner, mirror Tiny Swords) 
   sem quota): `clecioespindola/godotPlatformer2D` (parcial) e
   `ChrisTutorials/ChrisTutorials-2D-Godot-Platformer` (pack completo em
   `Art/Pixel Adventure 2/Enemies/`). Frame size está no nome do arquivo: `Idle (36x30).png`.
+- **PixelLab API** (api.pixellab.ai/v2, keys em `.env`, roteador `scripts/pixellab-route.py`,
+  pipeline idempotente `scripts/gen_neve.py` com estado em `public/assets/64/ai/state.json`):
+  - POSTs async retornam **202** com `*_id`; poll em `GET /tilesets/{id}`, `/characters/{id}`,
+    `/map-objects/{id}` (423 = ainda processando; map-objects pronto = `download_url`).
+  - `/balance` → `subscription.generations` = gerações RESTANTES do trial (40/conta).
+  - `create-tileset` (Wang 16 tiles, `tile_size` 16 default — pedir **32** e upscale 2×):
+    cada tile tem `corners` NW/NE/SW/SE upper|lower → pintar ilha em **dual-grid**
+    (tile em cada nó de canto, offset -32px). No fim usamos recolor do TS no chão
+    (coesão) e guardamos o Wang em `ai/snow/`.
+  - `create-character-with-4-directions` → frames saem 92×92 (não 64); anims via
+    `/characters/animations` template `walk`; **templates quadrúpedes (dog) usam ids
+    próprios** (`walk-6-frames`). Resultado em `rotation_urls` (dict por direção) +
+    `animations[].directions[].frames` (URLs diretas).
+  - CDN backblaze.pixellab.ai bloqueia o User-Agent padrão do urllib — mandar
+    `User-Agent: Mozilla/5.0`.
+  - Recolor de bioma (palette swap): máscara `g > b` pega verdes+amarelos e preserva
+    contornos navy do Tiny Swords; rampa de luminância → neve (`ai/Tilemap_Snow.png`).
 
 ## Convenções dos demos
 

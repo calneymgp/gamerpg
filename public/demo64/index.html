@@ -40,11 +40,13 @@
 <body>
 <div class="hud">
   <a href="../">← Hub</a>
-  <span class="chip"><b>64×64</b> · 3 biomas · 15 monstros · paper doll</span>
+  <span class="chip"><b>64×64</b> · 4 biomas · 18 monstros · paper doll · bioma NEVE por IA</span>
   <span class="hint">WASD/setas · espaço ataca · I abre inventário</span>
 </div>
 <button id="invToggle">🎒 Inventário</button>
 <div id="inv">
+  <h3>Personagem</h3>
+  <div class="slots" id="slotsS"></div>
   <h3>Armas</h3>
   <div class="slots" id="slotsW"></div>
   <h3>Armaduras</h3>
@@ -77,12 +79,13 @@ function buildSlots(elId, items, kind) {
     el.appendChild(b);
   }
 }
+buildSlots('slotsS', [['skin_lpc', 'Herói LPC'], ['skin_ai', 'Cavaleiro IA ✦']], 'skin');
 buildSlots('slotsW', WEAPONS_UI, 'weapon');
 buildSlots('slotsA', ARMORS_UI, 'armor');
 document.getElementById('invToggle').onclick = () =>
   document.getElementById('inv').classList.toggle('open');
 window.__markEquipped = (kind, id) => {
-  const el = document.getElementById(kind === 'weapon' ? 'slotsW' : 'slotsA');
+  const el = document.getElementById(kind === 'weapon' ? 'slotsW' : kind === 'skin' ? 'slotsS' : 'slotsA');
   el.querySelectorAll('.slot').forEach(s => s.classList.toggle('sel', s.dataset.id === id));
 };
 addEventListener('keydown', e => {

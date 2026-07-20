@@ -1,0 +1,21 @@
+{
+ "edge_types": [
+  "lower",
+  "upper"
+ ],
+ "terrain_prompts": {
+  "lower": "calm teal ocean water",
+  "upper": "thick white snow with soft blue shadows, sparkling",
+  "transition": "snowy shoreline edge"
+ },
+ "terrain_ids": null,
+ "transition_size": 0.0,
+ "view": "high top-down",
+ "generation_parameters": {
+  "tile_strength": 1.0,
+  "tileset_adherence": 100.0,
+  "text_guidance_scale": 8.0,
+  "tileset_adherence_freedom": 500
+ },
+ "created_at": "2026-07-20T02:34:16.629293+00:00"
+}

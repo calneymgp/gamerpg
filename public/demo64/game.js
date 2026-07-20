@@ -1,23 +1,25 @@
 /* Ilha de Elmsong 2.0 — 3 biomas, 15 monstros (CC0), paper doll LPC com inventário */
 (function () {
   const { GridWalker, Wanderer, Joystick, ActionButton, keyboardVec, makeKeys } = RPGLab;
-  const TILE = 64, WORLD_W = 42, WORLD_H = 15;
+  const TILE = 64, WORLD_W = 55, WORLD_H = 15;
 
-  // --- mundo: 3 ilhas + pontes ---
+  // --- mundo: 4 ilhas + pontes ---
   const ISLES = {
     campo: { x: 2, y: 3, w: 10, h: 9, base: 0, titulo: 'CAMPO' },
     deserto: { x: 15, y: 3, w: 10, h: 9, base: 5, titulo: 'DESERTO' },
     pedra: { x: 28, y: 3, w: 10, h: 9, base: null, titulo: 'PEDRA' },
+    neve: { x: 41, y: 3, w: 10, h: 9, base: null, titulo: 'NEVE ✦ IA' },
   };
-  const BRIDGES = [[12, 7], [13, 7], [14, 7], [25, 7], [26, 7], [27, 7]];
+  const BRIDGES = [[12, 7], [13, 7], [14, 7], [25, 7], [26, 7], [27, 7], [38, 7], [39, 7], [40, 7]];
   const TREES = [[4, 4], [9, 5], [3, 9]];
+  const TREES_NEVE = [[43, 4], [48, 5], [44, 10], [49, 11], [46, 6]];
   const SPAWN = { x: 7, y: 7 };
 
   const inRect = (r, tx, ty) => tx >= r.x && tx < r.x + r.w && ty >= r.y && ty < r.y + r.h;
   const onLand = (tx, ty) =>
     Object.values(ISLES).some(r => inRect(r, tx, ty)) ||
     BRIDGES.some(([bx, by]) => bx === tx && by === ty);
-  const blocked = new Set(TREES.map(([x, y]) => x + ',' + y));
+  const blocked = new Set([...TREES, ...TREES_NEVE].map(([x, y]) => x + ',' + y));
 
   // --- escalas (ajuste fino de proporção vs cenário) ---
   const SCALE = { player: 1.6, mob: 1.6, goblin: 0.8, sheep: 0.85 };
@@ -69,6 +71,14 @@
       const n = String(i).padStart(2, '0');
       this.load.image('deco' + n, A + 'deco/' + n + '.png');
     }
+    // remake: Tilemap_Flat recolorido para neve (mesma estrutura de blocos 3×3)
+    this.load.spritesheet('snowflat', A + 'ai/Tilemap_Snow.png', { frameWidth: 64, frameHeight: 64 });
+    this.load.image('aitree', A + 'ai/tree.png');
+    // personagens IA (PixelLab): frames 92px, idle 1 col, walk 6 cols, linhas n/w/s/e
+    for (const n of ['hero', 'yeti', 'golem', 'wolf']) {
+      this.load.spritesheet('ai' + n + '-idle', A + 'ai/' + n + '_idle.png', { frameWidth: 92, frameHeight: 92 });
+      this.load.spritesheet('ai' + n + '-walk', A + 'ai/' + n + '_walk.png', { frameWidth: 92, frameHeight: 92 });
+    }
     // camadas LPC (64px por frame)
     for (const c of [...CLOTH, ...Object.values(TORSOS)]) {
       for (const anim of ['walk', 'slash', 'thrust']) {
@@ -86,14 +96,15 @@
     }
   }
 
-  function paintRect(scene, rect, base, depth) {
+  function paintRect(scene, rect, base, depth, tex = 'flat') {
     for (let y = 0; y < rect.h; y++) for (let x = 0; x < rect.w; x++) {
       const c = x === 0 ? 0 : (x === rect.w - 1 ? 2 : 1);
       const r = y === 0 ? 0 : (y === rect.h - 1 ? 2 : 1);
-      scene.add.image((rect.x + x) * TILE, (rect.y + y) * TILE, 'flat', base + r * 10 + c)
+      scene.add.image((rect.x + x) * TILE, (rect.y + y) * TILE, tex, base + r * 10 + c)
         .setOrigin(0).setDepth(depth);
     }
   }
+
   function paintStone(scene, rect, depth) {
     for (let y = 0; y < rect.h; y++) for (let x = 0; x < rect.w; x++) {
       const c = x === 0 ? 0 : (x === rect.w - 1 ? 2 : 1);
@@ -122,6 +133,7 @@
     paintRect(this, ISLES.campo, 0, -80);
     paintRect(this, ISLES.deserto, 5, -80);
     paintStone(this, ISLES.pedra, -80);
+    paintRect(this, ISLES.neve, 0, -80, 'snowflat');
 
     // pontes (linha horizontal: frames 0,1,2 do sheet)
     BRIDGES.forEach(([x, y], i) => {
@@ -143,6 +155,11 @@
     TREES.forEach(([x, y]) => {
       const t = this.add.sprite(x * TILE + 32, y * TILE + 56, 'tree').setOrigin(0.5, 0.85);
       t.setDepth(t.y).play({ key: 'tree-sway', startFrame: (x + y) % 4 });
+    });
+    // pinheiros nevados gerados por IA
+    TREES_NEVE.forEach(([x, y]) => {
+      const t = this.add.image(x * TILE + 32, (y + 1) * TILE - 4, 'aitree').setOrigin(0.5, 1);
+      t.setDepth((y + 1) * TILE - 4);
     });
     // deco por bioma
     const rng = new Phaser.Math.RandomDataGenerator(['elmsong2']);
@@ -218,6 +235,30 @@
     };
     spawnGoblin('Goblin Tocha', 'goblin', [36, 6], ISLES.pedra);
     spawnGoblin('Goblin TNT', 'tnt', [23, 4], ISLES.deserto);
+    // monstros gerados por IA (4 direções reais + walk)
+    const spawnAIMob = (nome, base, cell, zone) => {
+      for (const [d, r] of Object.entries(ROWS)) {
+        mk(base + '-walk-' + d, base + '-walk', r * 6, r * 6 + 5, 10, -1);
+      }
+      const cont = this.add.container(0, 0);
+      const spr = this.add.sprite(0, 28, base + '-idle', 2).setOrigin(0.5, 0.95);
+      const lbl = this.add.text(0, -70, nome, { fontFamily: 'sans-serif', fontSize: '12px',
+        color: '#9fdcff', stroke: '#000', strokeThickness: 3 }).setOrigin(0.5);
+      cont.add([spr, lbl]);
+      const walker = new GridWalker(this, cont, {
+        tile: TILE, tx: cell[0], ty: cell[1], stepMs: 400, mode: 4,
+        walkable: (tx, ty) => walkableBase(tx, ty) && inRect(zone, tx, ty),
+        setAnim: (st, dir) => {
+          if (st === 'walk') spr.play(base + '-walk-' + dir, true);
+          else { spr.anims.stop(); spr.setTexture(base + '-idle', ROWS[dir]); }
+          cont.setDepth(cont.y);
+        },
+      });
+      this.mobs.push(new Wanderer(this, walker, { pauseMin: 1400, pauseMax: 4200 }));
+    };
+    spawnAIMob('Yeti ✦IA', 'aiyeti', [43, 6], ISLES.neve);
+    spawnAIMob('Golem de Gelo ✦IA', 'aigolem', [47, 9], ISLES.neve);
+    spawnAIMob('Lobo Ártico ✦IA', 'aiwolf', [45, 4], ISLES.neve);
     // ovelhas (ambiente)
     mk('sheep-idle', 'sheep', 0, -1, 3, -1);
     [[3, 8], [10, 9], [16, 4]].forEach(([sx, sy], i) => {
@@ -235,14 +276,20 @@
     });
 
     // ------- player paper doll -------
-    const P = this.P = { armor: 'leather', weapon: 'longsword', dir: 's', attacking: false };
+    const P = this.P = { skin: 'lpc', armor: 'leather', weapon: 'longsword', dir: 's', attacking: false };
     const doll = this.add.container(0, 0);
     const mkLayer = () => this.add.sprite(0, 24, 'body-walk', 2 * 9).setScale(SCALE.player);
     const layers = this.layers = {
       wb: mkLayer(), body: mkLayer(), feet: mkLayer(), legs: mkLayer(),
       torso: mkLayer(), head: mkLayer(), hair: mkLayer(), wf: mkLayer(),
     };
-    doll.add(Object.values(layers));
+    const aiSpr = this.aiSpr = this.add.sprite(0, 24, 'aihero-idle', 2)
+      .setOrigin(0.5, 0.93).setVisible(false);
+    doll.add([...Object.values(layers), aiSpr]);
+    for (const [d, r] of Object.entries(ROWS)) {
+      this.anims.create({ key: 'aihero-walk-' + d, frameRate: 11, repeat: -1,
+        frames: this.anims.generateFrameNumbers('aihero-walk', { start: r * 6, end: r * 6 + 5 }) });
+    }
 
     const texFor = (layer, anim) => {
       if (layer === 'torso') return `${TORSOS[P.armor]}-${anim}`;
@@ -271,6 +318,15 @@
       P.dir = dir;
       const d4 = toCardinal(dir);
       const row = ROWS[d4];
+      if (P.skin === 'ai') {
+        Object.values(layers).forEach(l => l.setVisible(false));
+        aiSpr.setVisible(true);
+        if (state === 'walk') aiSpr.play('aihero-walk-' + d4, true);
+        else { aiSpr.anims.stop(); aiSpr.setTexture('aihero-idle', row); }
+        doll.setDepth(doll.y);
+        return;
+      }
+      aiSpr.setVisible(false);
       const anim = state === 'attack' ? ATTACK_ANIM[P.weapon] : 'walk';
       for (const [name, spr] of Object.entries(layers)) {
         const tex = texFor(name, anim);
@@ -295,6 +351,13 @@
 
     const attack = () => {
       if (P.attacking) return;
+      if (P.skin === 'ai') {
+        // herói IA não tem anim de ataque — investida rápida como feedback
+        P.attacking = true;
+        this.tweens.add({ targets: aiSpr, scaleX: 1.18, scaleY: 0.92, duration: 90,
+          yoyo: true, onComplete: () => { P.attacking = false; } });
+        return;
+      }
       P.attacking = true;
       setDoll('attack', P.dir);
       layers.body.once('animationcomplete', () => {
@@ -305,11 +368,16 @@
 
     window.__equip = (kind, id) => {
       if (kind === 'weapon') P.weapon = id;
-      else P.armor = id;
+      else if (kind === 'armor') P.armor = id;
+      else if (kind === 'skin') P.skin = id.replace('skin_', '');
       if (!P.attacking) setDoll(this.player.moving ? 'walk' : 'idle', P.dir);
       window.__markEquipped && window.__markEquipped(kind, id);
     };
-    window.__markEquipped && (window.__markEquipped('weapon', P.weapon), window.__markEquipped('armor', P.armor));
+    if (window.__markEquipped) {
+      window.__markEquipped('weapon', P.weapon);
+      window.__markEquipped('armor', P.armor);
+      window.__markEquipped('skin', 'skin_' + P.skin);
+    }
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, W, H);

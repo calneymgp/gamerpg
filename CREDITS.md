@@ -30,6 +30,14 @@ Este repositório usa apenas assets gratuitos de terceiros. Downloads brutos em 
     Michael Whitlock "bigbeargames", Matthew Krohn "makrohn", Lanea Zimmerman "Sharm",
     entre outros). Derivados devem manter share-alike.
 
+### Bioma NEVE — assets gerados por IA (PixelLab)
+- **Tileset Wang de neve, pinheiro nevado, Cavaleiro de Gelo (herói), Yeti, Golem de Gelo
+  e Lobo Ártico** — gerados via https://api.pixellab.ai (contas do projeto), 2026-07-19.
+  Direitos de uso conforme os termos do PixelLab para conteúdo gerado pelo usuário.
+  O chão da ilha usa `ai/Tilemap_Snow.png` — recolor (palette swap) do Tilemap_Flat do
+  Tiny Swords (CC0); o tileset 100% IA fica preservado em `ai/snow/`.
+  Pipeline: `scripts/gen_neve.py` + roteador de chaves `scripts/pixellab-route.py`.
+
 ## Engine
 - **Phaser 4.2.1** — MIT — https://phaser.io (vendorizado em `public/vendor/phaser.min.js`)
 
