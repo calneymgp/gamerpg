@@ -40,6 +40,9 @@ Este repositório usa apenas assets gratuitos de terceiros. Downloads brutos em 
   derivado dos cavalos do bluecarrot16 pelo autor do asset (não exige crédito próprio).
   - Fonte: https://opengameart.org/content/lpc-horse-riding-updated-091
   - Pipeline: `scripts/build_mounts.py` (Scale2x 2×, mesmo esquema do paper doll).
+- **Porco Rosa** — gerado via https://api.pixellab.ai (2026-07-20), pipeline
+  `scripts/gen_montarias_ia.py`. Direitos conforme os termos do PixelLab para
+  conteúdo gerado pelo usuário.
 
 ### Bioma NEVE — assets gerados por IA (PixelLab)
 - **Tileset Wang de neve, pinheiro nevado, Cavaleiro de Gelo (herói), Yeti, Golem de Gelo

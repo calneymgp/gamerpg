@@ -25,9 +25,9 @@ O usuário escolheu o 64×64 — demos 32/128 foram DELETADOS (zips brutos ainda
 - **Paper doll LPC**: personagem em camadas (weapon_behind → body → feet → legs → torso →
   head → weapon), 5 armas + 5 armaduras trocáveis via inventário DOM (🎒 / tecla I),
   visíveis andando e atacando. `window.__equip(kind, id)` é a ponte DOM→jogo.
-- **Montarias**: 5 cavalos LPC (marrom/preto/cinza/dourado/branco) equipáveis no
-  inventário; montado galopa a 260px/s (a pé 165), armas se recolhem, ataque vira
-  investida. Ver "Montarias LPC" no pipeline abaixo.
+- **Montarias**: 5 cavalos LPC (marrom/preto/cinza/dourado/branco) + Porco Rosa ✦IA
+  equipáveis no inventário; montado galopa a 260px/s (porco 220, a pé 165), armas se
+  recolhem, ataque vira investida. Ver "Montarias LPC" e "Montarias IA" no pipeline.
 
 Hub em `public/index.html`. Licenças em `CREDITS.md` (monstros CC0; LPC é CC-BY-SA!).
 
@@ -99,6 +99,13 @@ _source/    NÃO runtime: lpc_64/ (originais) + ai_gen/ (pipeline PixelLab, stat
   é foreground com furo recortado pro cavaleiro). Cavalo 128 centrado no frame 64 do
   doll deixa os cascos na linha dos pés (~2px de ajuste). Pipeline `scripts/build_mounts.py`
   (Scale2x 2×, zip cacheado em `assets/lpc_ride/`).
+- **Montarias IA** (`scripts/gen_montarias_ia.py`, PixelLab template `dog` +
+  `walk-6-frames`): camada ÚNICA — bicho 92px escala nativa desenhado ATRÁS do
+  cavaleiro cortado na cintura (config `AI_MOUNTS` no game.js: `dy` compensa margem
+  vazia do frame, `offs` por direção). ⚠ Jobs de direção da animação podem MORRER no
+  servidor (a direção nunca aparece em `animations[].directions` — 20min+ sem mudar):
+  o script segue com n/s + um lado e ESPELHA o lado faltante (flip horizontal, custo
+  zero). Rotação "north" de quadrúpede IA sai meio 3/4, não rear-view limpa.
 - **PixelLab API** (api.pixellab.ai/v2, keys em `.env`, roteador `scripts/pixellab-route.py`,
   pipeline idempotente `scripts/gen_neve.py` com estado em `public/assets/64/ai/state.json`):
   - POSTs async retornam **202** com `*_id`; poll em `GET /tilesets/{id}`, `/characters/{id}`,

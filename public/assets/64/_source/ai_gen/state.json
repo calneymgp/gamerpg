@@ -30,5 +30,10 @@
   "character_id": "d54bcd9d-36ea-4de2-8abc-a98c6d51934e",
   "job_id": null,
   "walk_requested": true
+ },
+ "mount_porco": {
+  "key": "Benjamin",
+  "character_id": "d9466590-f530-41ca-8793-ffc3c2ef2f57",
+  "walk_requested": true
  }
 }
