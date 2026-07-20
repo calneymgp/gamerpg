@@ -487,17 +487,41 @@
           else spr.play(ensureMountAnim(tex, row), true);
         }
       }
-      // cavaleiro: pose parada, cortado na cintura (o cavalo em frente completa a perna)
+      // cavaleiro: tronco cortado na cintura; ATACA montado (anim de golpe nas camadas
+      // de cima, arma sem corte); nas montarias IA a PERNA fica pendurada NA FRENTE
+      // (crop invertido da cintura p/ baixo — a "perna do lado de cá")
+      const attacking = state === 'attack';
+      const anim = attacking ? ATTACK_ANIM[P.weapon] : 'walk';
       for (const [name, spr] of Object.entries(layers)) {
-        const tex = texFor(name, 'walk');
-        if (name === 'wb' || name === 'wf' || !this.textures.exists(tex)) { spr.setVisible(false); continue; }
+        const isWeapon = name === 'wb' || name === 'wf';
+        const isLeg = name === 'legs' || name === 'feet';
+        if (isLeg) {
+          // perna visível só nas montarias IA (camada única) e não de costas (vista n)
+          const ltex = texFor(name, 'walk');
+          if (!ai || d4 === 'n' || !this.textures.exists(ltex)) { spr.setVisible(false); continue; }
+          spr.setVisible(true);
+          spr.anims.stop();
+          spr.setTexture(ltex, row * COLS.walk);
+          spr.setOrigin(0.5, 0.95);
+          spr.setCrop(0, 96, 128, 32);
+          continue;
+        }
+        const tex = texFor(name, anim);
+        if ((isWeapon && !attacking) || !this.textures.exists(tex)) { spr.setVisible(false); continue; }
         spr.setVisible(true);
-        spr.anims.stop();
-        spr.setTexture(tex, row * COLS.walk);
-        spr.setOrigin(0.5, 0.95);
-        spr.setCrop(0, 0, 128, 100);
+        if (attacking) {
+          spr.play(ensureAnim(tex, anim, row), true);
+          applyOrigin(spr);
+          if (isWeapon) spr.setCrop();               // arco da arma completo
+          else spr.setCrop(0, 0, spr.frame.width, Math.round(spr.frame.height * 0.78));
+        } else {
+          spr.anims.stop();
+          spr.setTexture(tex, row * COLS.walk);
+          spr.setOrigin(0.5, 0.95);
+          spr.setCrop(0, 0, 128, 100);
+        }
       }
-      const pose = P.mount + '|' + cycle + '|' + d4;
+      const pose = P.mount + '|' + cycle + '|' + d4 + (attacking ? '|atk' : '');
       if (ridePose !== pose) { ridePose = pose; applyRide(cycle, d4, 0); }
     };
     const setDoll = this.setDoll = (state, dir) => {
@@ -543,13 +567,14 @@
 
     const attack = () => {
       if (P.attacking) return;
-      if (P.skin === 'ai' || P.mount) {
-        // sem anim de ataque (herói IA / montado) — investida rápida como feedback
+      if (P.skin === 'ai') {
+        // herói IA não tem anim de ataque — investida rápida como feedback
         P.attacking = true;
-        this.tweens.add({ targets: P.mount ? doll : aiSpr, scaleX: 1.18, scaleY: 0.92,
+        this.tweens.add({ targets: aiSpr, scaleX: 1.18, scaleY: 0.92,
           duration: 90, yoyo: true, onComplete: () => { P.attacking = false; } });
         return;
       }
+      // a pé OU montado: golpe real do paper doll (montado, renderMounted anima o tronco+arma)
       P.attacking = true;
       setDoll('attack', P.dir);
       layers.body.once('animationcomplete', () => {
