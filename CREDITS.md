@@ -5,11 +5,14 @@ Este repositório usa apenas assets gratuitos de terceiros. Downloads brutos em 
 
 ## Ilha de Elmsong (demo64)
 
-### Terreno, água, árvores, ovelhas e goblins
+### Terreno, água, árvores, ovelhas, goblins, construções e UI
 - **Tiny Swords** — Pixel Frog. Tilemaps (flat/elevation/bridge), água/espuma, árvores,
-  deco, ovelha, goblins (Tocha e TNT).
-  - Fonte: https://pixelfrog-assets.itch.io/tiny-swords (via mirror `6-team/tiny-swords`)
-  - Licença: **CC0** (domínio público).
+  deco, ovelha, goblins (Tocha e TNT), construções da villa (castelo/casa/torre + goblin),
+  e **pack de UI** (barras base+fill 3-slice, moldura de retrato — HUD do demo64).
+  - Fonte: https://pixelfrog-assets.itch.io/tiny-swords (mirrors `6-team/tiny-swords`,
+    `MauroCastro1705/tiny_swords` p/ Update 010 + UI)
+  - Licença: uso pessoal e comercial + modificação livres; crédito opcional; proibido
+    revender/redistribuir o pack. (versão antiga era CC0.)
 
 ### Monstros (12 espécies)
 - **Pixel Adventure 1 & 2** — Pixel Frog. AngryPig, Bat, Bee, Bunny, Chicken, Ghost,

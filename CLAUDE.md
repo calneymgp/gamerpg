@@ -59,6 +59,29 @@ _source/    NÃO runtime: lpc_64/ (originais) + ai_gen/ (pipeline PixelLab, stat
   Tiny Swords (192px) e terreno (64px) não sofrem upscale. Scripts: `upscale_lpc.py`,
   `reorg_assets.py`.
 
+## Suíte de sprites por IA — "Loot Hunter" (workflow oficial de criação)
+
+Três skills globais instaladas em `~/.claude/skills/` (invocáveis por nome). Fluxo
+**Gerar → Processar → Integrar**, feito para Phaser 4 (nosso engine):
+
+1. **`pixel-sprite-maker`** — GERA a matéria-prima. Mockup → imagem-âncora (idle) →
+   animações. Método certo por tipo: Python/PIL (idle), canvas-fill/gpt-image (attack/hurt),
+   vídeo IA Sora/Grok/Kling (walk/run). Templates em `templates/ref_pixelgrid_64.png` etc.
+2. **`sprite-post`** — PROCESSA raw→game-ready. `chroma_key.py` (green/blue/black/**magenta**
+   + halo remover), `normalize.py` (feet-anchor, spacing igual, dedup, anti-drift, `--report`
+   de silhueta), `pixel_treat.py` (trava paleta ≤24-48 cores, `check`), `video_to_frames.py`
+   (ffmpeg — **não instalado no servidor**; só p/ input de vídeo).
+3. **`sprite-to-engine`** — INTEGRA. `to_engine.py <pasta> --engine phaser --size 64 --fps 8`
+   lê sheets nomeados por convenção (`walk-down.png`, `idle-left.png`) e cospe o código
+   `preloadSprites`/`createAnims`. Truque: **East = West espelhado** (`setFlipX`), loop off
+   p/ death/attack/cast.
+
+Pipeline validado ponta-a-ponta com `pixel_knight_walk.png` (Sora, fundo magenta, 8 frames):
+`chroma_key --screen magenta --halo 2` → fatiar 8 → `normalize --anchor feet --cols 8` →
+`pixel_treat quantize` (24 cores) → `to_engine`. Saída em
+`public/assets/64/creatures/common/knight/` (walk-right.png 512×64 + anims.js). ⚠ É só a
+vista **lateral** (leste); um top-down 4-direções precisa gerar n/s (PixelLab) ou aceitar perfil.
+
 ## Pipeline de assets (aprendizados que valem repetir)
 
 - **Reiner's Tilesets** (`reinerstilesets.de/zips2d/T_*.zip`): BMPs individuais por frame
