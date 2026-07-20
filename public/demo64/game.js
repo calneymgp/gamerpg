@@ -67,8 +67,11 @@
   // offs = [modX, modY] do cavaleiro por direção, em px da arte 64
   const AI_MOUNTS = {
     // dy: o frame IA tem margem vazia embaixo — posiciona os pés na linha do chão (~26)
-    porco: { frame: 92, walkCols: 6, speed: 220, dy: 46,
-             offs: { n: [0, -13], w: [0, -13], s: [0, -14], e: [0, -13] } },
+    // bob: deslocamento extra do cavaleiro por frame do walk (px da arte 64) — trote
+    porco: { frame: 92, walkCols: 6, speed: 230, dy: 46, rate: 14,
+             bob: [0, -2, -4, -2, 0, -1],
+             // w espelhado do east: corpo do porco é off-center, sela cai +4px à direita
+             offs: { n: [0, -13], w: [4, -13], s: [0, -14], e: [0, -13] } },
   };
 
   // --- monstros Pixel Adventure (upscalados 2x → frame nativo × 2 no load): ---
@@ -141,17 +144,10 @@
     }
     this.load.spritesheet('aihero-idle', A + 'player/hero_ia/idle.png', { frameWidth: 92, frameHeight: 92 });
     this.load.spritesheet('aihero-walk', A + 'player/hero_ia/walk.png', { frameWidth: 92, frameHeight: 92 });
-    // --- ui/ (HUDs: PixelLab IA + Kenney CC0) ---
-    this.load.image('ui-ai-panel', A + 'ui/ai/panel.png');
-    this.load.image('ui-ai-heart', A + 'ui/ai/heart.png');
-    this.load.image('ui-ai-coin', A + 'ui/ai/coin.png');
-    this.load.image('ken-panel', A + 'ui/kenney/panel_beige.png');
-    this.load.image('ken-barL', A + 'ui/kenney/barBack_horizontalLeft.png');
-    this.load.image('ken-barM', A + 'ui/kenney/barBack_horizontalMid.png');
-    this.load.image('ken-barR', A + 'ui/kenney/barBack_horizontalRight.png');
-    this.load.image('ken-redL', A + 'ui/kenney/barRed_horizontalLeft.png');
-    this.load.image('ken-redM', A + 'ui/kenney/barRed_horizontalMid.png');
-    this.load.image('ken-redR', A + 'ui/kenney/barRed_horizontalRight.png');
+    // --- ui/ (HUD Kenney CC0, pré-pixelado em escala 3 via downscale→upscale nearest) ---
+    this.load.image('ken-panel', A + 'ui/kenney/panel_px.png');
+    this.load.image('ken-barback', A + 'ui/kenney/barback_px.png');
+    this.load.image('ken-barred', A + 'ui/kenney/barred_px.png');
   }
 
   function paintRect(scene, rect, base, depth, tex = 'flat') {
@@ -409,15 +405,25 @@
       }
       return key;
     };
-    // desloca o cavaleiro pro offset da sela (tabela RIDE_OFF, sincronizado com o frame do cavalo)
+    // desloca o cavaleiro pro offset da sela, sincronizado com o frame da montaria
     const applyRide = (cycle, d4, col) => {
       const ai = AI_MOUNTS[P.mount];
-      const off = ai ? [ai.offs[d4]] : RIDE_OFF[cycle][d4];
+      if (ai) {
+        const [mx, my] = ai.offs[d4];
+        const bob = cycle === 'walk' && ai.bob ? ai.bob[col % ai.bob.length] : 0;
+        for (const spr of Object.values(layers)) spr.setPosition(mx * K, 24 + (my + bob) * K);
+        return;
+      }
+      const off = RIDE_OFF[cycle][d4];
       const [mx, my] = off[col] || off[0];
       for (const spr of Object.values(layers)) spr.setPosition(mx * K, 24 + my * K);
     };
     mountF.on('animationupdate', (anim, frame) => {
       if (P.mount) applyRide('gallop', toCardinal(P.dir), frame.frame.name % 4);
+    });
+    mountB.on('animationupdate', (anim, frame) => { // montarias IA animam no mountB
+      const ai = AI_MOUNTS[P.mount];
+      if (ai) applyRide('walk', toCardinal(P.dir), frame.frame.name % ai.walkCols);
     });
     let ridePose = null; // setAnim roda todo tick — só reposiciona o cavaleiro em mudança de pose
     const renderMounted = (state, d4, row) => {
@@ -426,7 +432,7 @@
       if (ai) { // camada única em escala nativa, atrás do cavaleiro
         mountF.setVisible(false);
         mountB.setVisible(true).setOrigin(0.5, 0.95).setScale(1).setPosition(0, ai.dy);
-        if (cycle === 'walk') mountB.play(ensureMountAnim(`mtai-${P.mount}-walk`, row, ai.walkCols, 12), true);
+        if (cycle === 'walk') mountB.play(ensureMountAnim(`mtai-${P.mount}-walk`, row, ai.walkCols, ai.rate), true);
         else { mountB.anims.stop(); mountB.setTexture(`mtai-${P.mount}-idle`, row); }
       } else {
         for (const [spr, l] of [[mountB, 'b'], [mountF, 'f']]) {
@@ -546,73 +552,43 @@
     cam.setBounds(0, 0, W, H);
     cam.startFollow(doll, true, 0.15, 0.15);
 
-    // ------- overhead do player: nome + barra de HP em cima do char -------
-    const ovName = this.add.text(0, -62, P.nome, {
-      fontFamily: 'sans-serif', fontSize: '13px', fontStyle: 'bold',
+    // ------- overhead do player: nome + barra de HP em cima do char (fonte pixel) -------
+    const ovName = this.add.text(0, -64, P.nome, {
+      fontFamily: '"Press Start 2P", monospace', fontSize: '9px',
       color: '#ffd76a', stroke: '#000', strokeThickness: 3,
     }).setOrigin(0.5);
-    const ovBarBg = this.add.rectangle(0, -48, 52, 7, 0x10131a, 0.9).setStrokeStyle(1, 0x000000, 1);
-    const ovBarFill = this.add.rectangle(-25, -48, 50, 5, 0x4ade80).setOrigin(0, 0.5);
+    const ovBarBg = this.add.rectangle(0, -48, 52, 8, 0x10131a, 1).setStrokeStyle(2, 0x000000, 1);
+    const ovBarFill = this.add.rectangle(-24, -48, 48, 4, 0x4ade80).setOrigin(0, 0.5);
     doll.add([ovName, ovBarBg, ovBarFill]);
 
-    // ------- HUDs (3 estilos chaveáveis; dados vêm de P) -------
+    // ------- HUDs chaveáveis (React no DOM; Kenney pixelado no canvas) -------
     const hudY = 64;
     const hpColor = (f) => (f > 0.5 ? 0x4ade80 : f > 0.25 ? 0xfbbf24 : 0xef4444);
+    const PXF = { fontFamily: '"Press Start 2P", monospace' };
 
-    // — HUD PixelLab (painel + ícones gerados por IA, desenhado no canvas) —
-    const hudPix = this.add.container(12, hudY).setScrollFactor(0).setDepth(1e6).setVisible(false);
-    {
-      const panel = this.add.image(0, 0, 'ui-ai-panel').setOrigin(0);
-      const heart = this.add.image(30, 34, 'ui-ai-heart').setScale(0.8);
-      const hpBg = this.add.rectangle(48, 34, 150, 12, 0x1a1030, 1).setOrigin(0, 0.5).setStrokeStyle(1, 0x000, 1);
-      const hpFill = this.add.rectangle(50, 34, 146, 8, 0x4ade80).setOrigin(0, 0.5);
-      const hpTxt = this.add.text(123, 34, '', { fontFamily: 'monospace', fontSize: '11px', fontStyle: 'bold', color: '#fff', stroke: '#000', strokeThickness: 2 }).setOrigin(0.5);
-      const nome = this.add.text(30, 16, P.nome, { fontFamily: 'monospace', fontSize: '13px', fontStyle: 'bold', color: '#ffd76a', stroke: '#000', strokeThickness: 2 }).setOrigin(0, 0.5);
-      const coin = this.add.image(30, 56, 'ui-ai-coin').setScale(0.7);
-      const goldTxt = this.add.text(44, 56, '', { fontFamily: 'monospace', fontSize: '12px', color: '#ffe9a0', stroke: '#000', strokeThickness: 2 }).setOrigin(0, 0.5);
-      const idadeTxt = this.add.text(130, 56, '', { fontFamily: 'monospace', fontSize: '12px', color: '#bfe3ff', stroke: '#000', strokeThickness: 2 }).setOrigin(0, 0.5);
-      hudPix.add([panel, heart, hpBg, hpFill, hpTxt, nome, coin, goldTxt, idadeTxt]);
-      hudPix.refresh = () => {
-        const f = P.hp / P.hpMax;
-        hpFill.width = Math.max(2, 146 * f);
-        hpFill.fillColor = hpColor(f);
-        hpTxt.setText(`${P.hp}/${P.hpMax}`);
-        goldTxt.setText(P.gold);
-        idadeTxt.setText(`Idade ${P.idade}`);
-      };
-    }
-
-    // — HUD Kenney (UI Pack RPG, CC0 — nineslice + barra seccionada) —
+    // — HUD Kenney CC0 (pré-pixelado escala 3 + fonte pixel) —
     const hudKen = this.add.container(12, hudY).setScrollFactor(0).setDepth(1e6).setVisible(false);
     {
       const panel = this.add.image(0, 0, 'ken-panel').setOrigin(0);
-      panel.setDisplaySize(252, 96);
-      const nome = this.add.text(16, 20, P.nome, { fontFamily: 'sans-serif', fontSize: '15px', fontStyle: 'bold', color: '#5a3a1a' }).setOrigin(0, 0.5);
-      const bl = this.add.image(16, 44, 'ken-barL').setOrigin(0, 0.5);
-      const bm = this.add.image(25, 44, 'ken-barM').setOrigin(0, 0.5);
-      const br = this.add.image(0, 44, 'ken-barR').setOrigin(0, 0.5);
-      const fl = this.add.image(16, 44, 'ken-redL').setOrigin(0, 0.5);
-      const fm = this.add.image(25, 44, 'ken-redM').setOrigin(0, 0.5);
-      const fr = this.add.image(0, 44, 'ken-redR').setOrigin(0, 0.5);
-      const BARW = 180;
-      bm.displayWidth = BARW; br.x = 25 + BARW;
-      const hpTxt = this.add.text(16 + (BARW + 18) / 2, 44, '', { fontFamily: 'sans-serif', fontSize: '11px', fontStyle: 'bold', color: '#fff', stroke: '#7a2a1a', strokeThickness: 2 }).setOrigin(0.5);
-      const goldTxt = this.add.text(16, 70, '', { fontFamily: 'sans-serif', fontSize: '13px', fontStyle: 'bold', color: '#8a6d1a' }).setOrigin(0, 0.5);
-      const idadeTxt = this.add.text(150, 70, '', { fontFamily: 'sans-serif', fontSize: '13px', fontStyle: 'bold', color: '#4a5a8a' }).setOrigin(0, 0.5);
-      hudKen.add([panel, nome, bl, bm, br, fl, fm, fr, hpTxt, goldTxt, idadeTxt]);
+      const nome = this.add.text(18, 21, P.nome, { ...PXF, fontSize: '11px', color: '#5a3a1a' }).setOrigin(0, 0.5);
+      const barBack = this.add.image(18, 44, 'ken-barback').setOrigin(0, 0.5);
+      const barRed = this.add.image(18, 44, 'ken-barred').setOrigin(0, 0.5);
+      const BARW = barRed.width;
+      const hpTxt = this.add.text(18 + BARW / 2, 45, '', { ...PXF, fontSize: '8px', color: '#fff', stroke: '#7a2a1a', strokeThickness: 3 }).setOrigin(0.5);
+      const goldTxt = this.add.text(18, 74, '', { ...PXF, fontSize: '9px', color: '#8a6d1a' }).setOrigin(0, 0.5);
+      const idadeTxt = this.add.text(146, 74, '', { ...PXF, fontSize: '9px', color: '#4a5a8a' }).setOrigin(0, 0.5);
+      hudKen.add([panel, nome, barBack, barRed, hpTxt, goldTxt, idadeTxt]);
       hudKen.refresh = () => {
         const f = P.hp / P.hpMax;
-        fm.displayWidth = Math.max(1, BARW * f);
-        fr.x = 25 + Math.max(1, BARW * f);
-        fr.setVisible(f > 0.03); fl.setVisible(f > 0);
+        barRed.setCrop(0, 0, Math.max(3, BARW * f), barRed.height);
         hpTxt.setText(`${P.hp}/${P.hpMax}`);
-        goldTxt.setText(`🪙 ${P.gold}`);
-        idadeTxt.setText(`🎂 Idade ${P.idade}`);
+        goldTxt.setText(`$ ${P.gold}`);
+        idadeTxt.setText(`IDADE ${P.idade}`);
       };
     }
 
     // — API de troca + refresh (o HUD React vive no DOM, ver index.html) —
-    this.huds = { pixellab: hudPix, kenney: hudKen };
+    this.huds = { kenney: hudKen };
     window.__hudData = () => ({ nome: P.nome, hp: P.hp, hpMax: P.hpMax, gold: P.gold, idade: P.idade });
     window.__hudRefresh = () => {
       const f = P.hp / P.hpMax;
@@ -699,10 +675,12 @@
     this.mobs.forEach(m => m.update(delta));
   }
 
-  new Phaser.Game({
+  // espera a fonte pixel antes de subir o jogo (textos do canvas usam Press Start 2P)
+  const boot = () => new Phaser.Game({
     type: Phaser.AUTO, parent: 'game', backgroundColor: '#4a90c4',
     pixelArt: true, roundPixels: true,
     scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
     scene: { preload, create, update },
   });
+  document.fonts.load('10px "Press Start 2P"').then(boot, boot);
 })();

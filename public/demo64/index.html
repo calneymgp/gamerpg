@@ -6,47 +6,51 @@
 <title>Ilha de Elmsong — 64×64 · biomas, monstros e paper doll</title>
 <link rel="stylesheet" href="../shared/style.css">
 <style>
-/* --- HUD React (DOM) --- */
+/* --- fonte pixel + HUD React (DOM, estilo 64px retrô) --- */
+@font-face {
+  font-family: 'Press Start 2P';
+  src: url('../vendor/fonts/PressStart2P.woff2') format('woff2');
+  font-display: block;
+}
 #hudReact {
-  position: fixed; top: 64px; left: 12px; z-index: 15; width: 260px;
-  background: linear-gradient(145deg, rgba(18,22,34,.92), rgba(28,20,44,.88));
-  border: 1px solid rgba(255,215,106,.35); border-radius: 16px;
-  padding: 12px 14px; color: #e8e6e0;
-  box-shadow: 0 8px 24px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.08);
-  backdrop-filter: blur(6px);
-  font-family: system-ui, sans-serif;
+  position: fixed; top: 64px; left: 12px; z-index: 15; width: 248px;
+  background: #1a2130;
+  border: 4px solid;
+  border-color: #55627c #0b0e16 #0b0e16 #55627c; /* bisel pixel: claro/escuro */
+  outline: 3px solid #000;
+  padding: 10px; color: #e8e6e0;
+  font-family: 'Press Start 2P', monospace;
+  image-rendering: pixelated;
 }
-#hudReact .top { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+#hudReact .top { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
 #hudReact .avatar {
-  width: 38px; height: 38px; border-radius: 50%; flex: none;
-  background: linear-gradient(135deg, #ffd76a, #e08a2e);
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 18px; color: #3a2408;
-  box-shadow: inset 0 -2px 4px rgba(0,0,0,.25);
+  width: 40px; height: 40px; flex: none;
+  border: 3px solid; border-color: #0b0e16 #55627c #55627c #0b0e16;
+  background: #26466a; overflow: hidden;
 }
-#hudReact .nome { font-weight: 700; font-size: 15px; color: #ffd76a; }
-#hudReact .sub { font-size: 11px; opacity: .65; }
+#hudReact .avatar img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+#hudReact .nome { font-size: 11px; color: #ffd76a; text-shadow: 2px 2px 0 #000; }
+#hudReact .sub { font-size: 6px; color: #8ea3c4; margin-top: 5px; }
 #hudReact .hpTrack {
-  height: 14px; border-radius: 8px; background: #14101e; overflow: hidden;
-  border: 1px solid rgba(0,0,0,.6); position: relative;
+  height: 14px; background: #0b0e16; position: relative;
+  border: 2px solid #000; box-shadow: inset 2px 2px 0 #050608;
 }
-#hudReact .hpFill {
-  height: 100%; border-radius: 8px;
-  background: linear-gradient(180deg, #6ee7a0, #22c55e 60%, #15803d);
-  transition: width .25s ease, background .3s;
-}
-#hudReact .hpFill.mid { background: linear-gradient(180deg, #fde68a, #f59e0b 60%, #b45309); }
-#hudReact .hpFill.low { background: linear-gradient(180deg, #fca5a5, #ef4444 60%, #991b1b); }
+#hudReact .hpFill { height: 100%; background: #4ade80; }
+#hudReact .hpFill.mid { background: #fbbf24; }
+#hudReact .hpFill.low { background: #ef4444; }
 #hudReact .hpNum {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  font-size: 10px; font-weight: 700; color: #fff; text-shadow: 0 1px 2px #000;
+  font-size: 7px; color: #fff; text-shadow: 1px 1px 0 #000;
 }
-#hudReact .stats { display: flex; gap: 8px; margin-top: 9px; }
+#hudReact .stats { display: flex; gap: 6px; margin-top: 8px; }
 #hudReact .pill {
-  flex: 1; display: flex; align-items: center; gap: 6px; justify-content: center;
-  background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12);
-  border-radius: 10px; padding: 5px 8px; font-size: 13px; font-weight: 600;
+  flex: 1; display: flex; align-items: center; gap: 5px; justify-content: center;
+  background: #10141f; border: 2px solid #000;
+  box-shadow: inset -2px -2px 0 #050608, inset 2px 2px 0 #2b344a;
+  padding: 6px 4px; font-size: 8px;
 }
+#hudReact .pill .gold { color: #ffd76a; }
+#hudReact .pill .idade { color: #9fdcff; }
 /* --- seletor de HUD --- */
 #hudSwitch {
   position: fixed; top: 172px; left: 12px; z-index: 15;
@@ -109,7 +113,6 @@
 <div id="hudReact"></div>
 <div id="hudSwitch">
   <button data-h="react">React</button>
-  <button data-h="pixellab">PixelLab ✦IA</button>
   <button data-h="kenney">Kenney CC0</button>
 </div>
 <div id="game"></div>
@@ -131,16 +134,17 @@
     const cls = 'hpFill' + (f <= 0.25 ? ' low' : f <= 0.5 ? ' mid' : '');
     return e(React.Fragment, null,
       e('div', { className: 'top' },
-        e('div', { className: 'avatar' }, d.nome[0]),
+        e('div', { className: 'avatar' },
+          e('img', { src: '../assets/64/ui/icons/skin_lpc.png', alt: '' })),
         e('div', null,
-          e('div', { className: 'nome' }, d.nome),
-          e('div', { className: 'sub' }, 'Aventureiro de Elmsong'))),
+          e('div', { className: 'nome' }, d.nome.toUpperCase()),
+          e('div', { className: 'sub' }, 'ELMSONG'))),
       e('div', { className: 'hpTrack' },
         e('div', { className: cls, style: { width: (f * 100) + '%' } }),
-        e('div', { className: 'hpNum' }, d.hp + ' / ' + d.hpMax)),
+        e('div', { className: 'hpNum' }, 'HP ' + d.hp + '/' + d.hpMax)),
       e('div', { className: 'stats' },
-        e('div', { className: 'pill' }, '🪙 ' + d.gold),
-        e('div', { className: 'pill' }, '🎂 Idade ' + d.idade)));
+        e('div', { className: 'pill' }, e('span', { className: 'gold' }, '$ ' + d.gold)),
+        e('div', { className: 'pill' }, e('span', { className: 'idade' }, 'IDADE ' + d.idade))));
   }
   ReactDOM.createRoot(document.getElementById('hudReact')).render(e(Hud));
 })();
@@ -153,7 +157,7 @@ document.querySelectorAll('#hudSwitch button').forEach(b =>
   b.onclick = () => window.__setHud && window.__setHud(b.dataset.h));
 </script>
 <script src="../vendor/phaser.min.js"></script>
-<script src="../shared/engine.js?v=hud3"></script>
+<script src="../shared/engine.js?v=hudpx"></script>
 <script>
 // inventário DOM — conversa com o jogo via window.__equip
 const WEAPONS_UI = [
@@ -199,6 +203,6 @@ addEventListener('keydown', e => {
   if (e.key === 'i' || e.key === 'I') document.getElementById('inv').classList.toggle('open');
 });
 </script>
-<script src="game.js?v=hud3"></script>
+<script src="game.js?v=hudpx"></script>
 </body>
 </html>
