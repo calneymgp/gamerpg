@@ -28,7 +28,7 @@
   // REGRA ABSOLUTA DE SIMETRIA: existe UMA envergadura global, e a MESMA distância
   // (entre centros dos walkers, calculada uma única vez por par/frame) decide o ataque
   // dos dois lados. Se o player alcança o bicho, o bicho alcança o player — sempre.
-  const COMBAT = { range: 78, playerCdMs: 900, mobCdMs: 1100 };
+  const COMBAT = { range: 30, playerCdMs: 900, mobCdMs: 1100 };
   const DIRN = { '1,0': 'e', '-1,0': 'w', '0,1': 's', '0,-1': 'n',
                  '1,1': 'se', '1,-1': 'ne', '-1,1': 'sw', '-1,-1': 'nw' };
   const dirBetween = (from, to) => {
@@ -62,6 +62,13 @@
       s: [[0, -21], [0, -22], [0, -25], [0, -23]],
       e: [[2, -32], [2, -28], [7, -24], [5, -26]],
     },
+  };
+  // montarias IA (PixelLab, camada única — bicho desenha ATRÁS do cavaleiro):
+  // offs = [modX, modY] do cavaleiro por direção, em px da arte 64
+  const AI_MOUNTS = {
+    // dy: o frame IA tem margem vazia embaixo — posiciona os pés na linha do chão (~26)
+    porco: { frame: 92, walkCols: 6, speed: 220, dy: 46,
+             offs: { n: [0, -13], w: [0, -13], s: [0, -14], e: [0, -13] } },
   };
 
   // --- monstros Pixel Adventure (upscalados 2x → frame nativo × 2 no load): ---
@@ -128,8 +135,23 @@
         }
       }
     }
+    for (const [m, cfg] of Object.entries(AI_MOUNTS)) {
+      this.load.spritesheet(`mtai-${m}-idle`, `${A}player/mount/${m}/idle.png`, { frameWidth: cfg.frame, frameHeight: cfg.frame });
+      this.load.spritesheet(`mtai-${m}-walk`, `${A}player/mount/${m}/walk.png`, { frameWidth: cfg.frame, frameHeight: cfg.frame });
+    }
     this.load.spritesheet('aihero-idle', A + 'player/hero_ia/idle.png', { frameWidth: 92, frameHeight: 92 });
     this.load.spritesheet('aihero-walk', A + 'player/hero_ia/walk.png', { frameWidth: 92, frameHeight: 92 });
+    // --- ui/ (HUDs: PixelLab IA + Kenney CC0) ---
+    this.load.image('ui-ai-panel', A + 'ui/ai/panel.png');
+    this.load.image('ui-ai-heart', A + 'ui/ai/heart.png');
+    this.load.image('ui-ai-coin', A + 'ui/ai/coin.png');
+    this.load.image('ken-panel', A + 'ui/kenney/panel_beige.png');
+    this.load.image('ken-barL', A + 'ui/kenney/barBack_horizontalLeft.png');
+    this.load.image('ken-barM', A + 'ui/kenney/barBack_horizontalMid.png');
+    this.load.image('ken-barR', A + 'ui/kenney/barBack_horizontalRight.png');
+    this.load.image('ken-redL', A + 'ui/kenney/barRed_horizontalLeft.png');
+    this.load.image('ken-redM', A + 'ui/kenney/barRed_horizontalMid.png');
+    this.load.image('ken-redR', A + 'ui/kenney/barRed_horizontalRight.png');
   }
 
   function paintRect(scene, rect, base, depth, tex = 'flat') {
@@ -335,7 +357,8 @@
     });
 
     // ------- player paper doll -------
-    const P = this.P = { skin: 'lpc', armor: 'leather', weapon: 'longsword', mount: null, dir: 's', attacking: false };
+    const P = this.P = { skin: 'lpc', armor: 'leather', weapon: 'longsword', mount: null, dir: 's', attacking: false,
+      nome: 'Calney', hp: 100, hpMax: 100, gold: 125, idade: 10 };
     const doll = this.add.container(0, 0);
     const mkLayer = () => this.add.sprite(0, 24, 'body-walk', 2 * 9).setScale(SCALE.player / 2);
     const layers = this.layers = {
@@ -378,17 +401,18 @@
       return key;
     };
     const toCardinal = (dir) => dir.includes('w') ? 'w' : dir.includes('e') ? 'e' : dir;
-    const ensureMountAnim = (tex, row) => {
+    const ensureMountAnim = (tex, row, cols = 4, rate = 11) => {
       const key = `${tex}|${row}`;
       if (!this.anims.exists(key)) {
-        this.anims.create({ key, frameRate: 11, repeat: -1,
-          frames: this.anims.generateFrameNumbers(tex, { start: row * 4, end: row * 4 + 3 }) });
+        this.anims.create({ key, frameRate: rate, repeat: -1,
+          frames: this.anims.generateFrameNumbers(tex, { start: row * cols, end: row * cols + cols - 1 }) });
       }
       return key;
     };
     // desloca o cavaleiro pro offset da sela (tabela RIDE_OFF, sincronizado com o frame do cavalo)
     const applyRide = (cycle, d4, col) => {
-      const off = RIDE_OFF[cycle][d4];
+      const ai = AI_MOUNTS[P.mount];
+      const off = ai ? [ai.offs[d4]] : RIDE_OFF[cycle][d4];
       const [mx, my] = off[col] || off[0];
       for (const spr of Object.values(layers)) spr.setPosition(mx * K, 24 + my * K);
     };
@@ -397,12 +421,20 @@
     });
     let ridePose = null; // setAnim roda todo tick — só reposiciona o cavaleiro em mudança de pose
     const renderMounted = (state, d4, row) => {
-      const cycle = state === 'walk' ? 'gallop' : 'stand';
-      for (const [spr, l] of [[mountB, 'b'], [mountF, 'f']]) {
-        const tex = `mt-${P.mount}-${cycle}${l}`;
-        spr.setVisible(true);
-        if (cycle === 'stand') { spr.anims.stop(); spr.setTexture(tex, row * 4); }
-        else spr.play(ensureMountAnim(tex, row), true);
+      const ai = AI_MOUNTS[P.mount];
+      const cycle = state === 'walk' ? (ai ? 'walk' : 'gallop') : 'stand';
+      if (ai) { // camada única em escala nativa, atrás do cavaleiro
+        mountF.setVisible(false);
+        mountB.setVisible(true).setOrigin(0.5, 0.95).setScale(1).setPosition(0, ai.dy);
+        if (cycle === 'walk') mountB.play(ensureMountAnim(`mtai-${P.mount}-walk`, row, ai.walkCols, 12), true);
+        else { mountB.anims.stop(); mountB.setTexture(`mtai-${P.mount}-idle`, row); }
+      } else {
+        for (const [spr, l] of [[mountB, 'b'], [mountF, 'f']]) {
+          const tex = `mt-${P.mount}-${cycle}${l}`;
+          spr.setVisible(true).setOrigin(0.5, 0.5).setScale(SCALE.player / 2).setPosition(0, 24 - 32 * K + 3);
+          if (cycle === 'stand') { spr.anims.stop(); spr.setTexture(tex, row * 4); }
+          else spr.play(ensureMountAnim(tex, row), true);
+        }
       }
       // cavaleiro: pose parada, cortado na cintura (o cavalo em frente completa a perna)
       for (const [name, spr] of Object.entries(layers)) {
@@ -414,7 +446,7 @@
         spr.setOrigin(0.5, 0.95);
         spr.setCrop(0, 0, 128, 100);
       }
-      const pose = cycle + '|' + d4;
+      const pose = P.mount + '|' + cycle + '|' + d4;
       if (ridePose !== pose) { ridePose = pose; applyRide(cycle, d4, 0); }
     };
     const setDoll = this.setDoll = (state, dir) => {
@@ -477,7 +509,7 @@
     const setMount = (m) => {
       P.mount = m;
       ridePose = null;
-      this.player.speed = m ? 260 : 165; // galope
+      this.player.speed = m ? (AI_MOUNTS[m] ? AI_MOUNTS[m].speed : 260) : 165; // galope/trote
       this.player.radius = m ? 16 : 12;
       if (!m) {
         mountB.setVisible(false); mountF.setVisible(false);
@@ -514,6 +546,102 @@
     cam.setBounds(0, 0, W, H);
     cam.startFollow(doll, true, 0.15, 0.15);
 
+    // ------- overhead do player: nome + barra de HP em cima do char -------
+    const ovName = this.add.text(0, -62, P.nome, {
+      fontFamily: 'sans-serif', fontSize: '13px', fontStyle: 'bold',
+      color: '#ffd76a', stroke: '#000', strokeThickness: 3,
+    }).setOrigin(0.5);
+    const ovBarBg = this.add.rectangle(0, -48, 52, 7, 0x10131a, 0.9).setStrokeStyle(1, 0x000000, 1);
+    const ovBarFill = this.add.rectangle(-25, -48, 50, 5, 0x4ade80).setOrigin(0, 0.5);
+    doll.add([ovName, ovBarBg, ovBarFill]);
+
+    // ------- HUDs (3 estilos chaveáveis; dados vêm de P) -------
+    const hudY = 64;
+    const hpColor = (f) => (f > 0.5 ? 0x4ade80 : f > 0.25 ? 0xfbbf24 : 0xef4444);
+
+    // — HUD PixelLab (painel + ícones gerados por IA, desenhado no canvas) —
+    const hudPix = this.add.container(12, hudY).setScrollFactor(0).setDepth(1e6).setVisible(false);
+    {
+      const panel = this.add.image(0, 0, 'ui-ai-panel').setOrigin(0);
+      const heart = this.add.image(30, 34, 'ui-ai-heart').setScale(0.8);
+      const hpBg = this.add.rectangle(48, 34, 150, 12, 0x1a1030, 1).setOrigin(0, 0.5).setStrokeStyle(1, 0x000, 1);
+      const hpFill = this.add.rectangle(50, 34, 146, 8, 0x4ade80).setOrigin(0, 0.5);
+      const hpTxt = this.add.text(123, 34, '', { fontFamily: 'monospace', fontSize: '11px', fontStyle: 'bold', color: '#fff', stroke: '#000', strokeThickness: 2 }).setOrigin(0.5);
+      const nome = this.add.text(30, 16, P.nome, { fontFamily: 'monospace', fontSize: '13px', fontStyle: 'bold', color: '#ffd76a', stroke: '#000', strokeThickness: 2 }).setOrigin(0, 0.5);
+      const coin = this.add.image(30, 56, 'ui-ai-coin').setScale(0.7);
+      const goldTxt = this.add.text(44, 56, '', { fontFamily: 'monospace', fontSize: '12px', color: '#ffe9a0', stroke: '#000', strokeThickness: 2 }).setOrigin(0, 0.5);
+      const idadeTxt = this.add.text(130, 56, '', { fontFamily: 'monospace', fontSize: '12px', color: '#bfe3ff', stroke: '#000', strokeThickness: 2 }).setOrigin(0, 0.5);
+      hudPix.add([panel, heart, hpBg, hpFill, hpTxt, nome, coin, goldTxt, idadeTxt]);
+      hudPix.refresh = () => {
+        const f = P.hp / P.hpMax;
+        hpFill.width = Math.max(2, 146 * f);
+        hpFill.fillColor = hpColor(f);
+        hpTxt.setText(`${P.hp}/${P.hpMax}`);
+        goldTxt.setText(P.gold);
+        idadeTxt.setText(`Idade ${P.idade}`);
+      };
+    }
+
+    // — HUD Kenney (UI Pack RPG, CC0 — nineslice + barra seccionada) —
+    const hudKen = this.add.container(12, hudY).setScrollFactor(0).setDepth(1e6).setVisible(false);
+    {
+      const panel = this.add.image(0, 0, 'ken-panel').setOrigin(0);
+      panel.setDisplaySize(252, 96);
+      const nome = this.add.text(16, 20, P.nome, { fontFamily: 'sans-serif', fontSize: '15px', fontStyle: 'bold', color: '#5a3a1a' }).setOrigin(0, 0.5);
+      const bl = this.add.image(16, 44, 'ken-barL').setOrigin(0, 0.5);
+      const bm = this.add.image(25, 44, 'ken-barM').setOrigin(0, 0.5);
+      const br = this.add.image(0, 44, 'ken-barR').setOrigin(0, 0.5);
+      const fl = this.add.image(16, 44, 'ken-redL').setOrigin(0, 0.5);
+      const fm = this.add.image(25, 44, 'ken-redM').setOrigin(0, 0.5);
+      const fr = this.add.image(0, 44, 'ken-redR').setOrigin(0, 0.5);
+      const BARW = 180;
+      bm.displayWidth = BARW; br.x = 25 + BARW;
+      const hpTxt = this.add.text(16 + (BARW + 18) / 2, 44, '', { fontFamily: 'sans-serif', fontSize: '11px', fontStyle: 'bold', color: '#fff', stroke: '#7a2a1a', strokeThickness: 2 }).setOrigin(0.5);
+      const goldTxt = this.add.text(16, 70, '', { fontFamily: 'sans-serif', fontSize: '13px', fontStyle: 'bold', color: '#8a6d1a' }).setOrigin(0, 0.5);
+      const idadeTxt = this.add.text(150, 70, '', { fontFamily: 'sans-serif', fontSize: '13px', fontStyle: 'bold', color: '#4a5a8a' }).setOrigin(0, 0.5);
+      hudKen.add([panel, nome, bl, bm, br, fl, fm, fr, hpTxt, goldTxt, idadeTxt]);
+      hudKen.refresh = () => {
+        const f = P.hp / P.hpMax;
+        fm.displayWidth = Math.max(1, BARW * f);
+        fr.x = 25 + Math.max(1, BARW * f);
+        fr.setVisible(f > 0.03); fl.setVisible(f > 0);
+        hpTxt.setText(`${P.hp}/${P.hpMax}`);
+        goldTxt.setText(`🪙 ${P.gold}`);
+        idadeTxt.setText(`🎂 Idade ${P.idade}`);
+      };
+    }
+
+    // — API de troca + refresh (o HUD React vive no DOM, ver index.html) —
+    this.huds = { pixellab: hudPix, kenney: hudKen };
+    window.__hudData = () => ({ nome: P.nome, hp: P.hp, hpMax: P.hpMax, gold: P.gold, idade: P.idade });
+    window.__hudRefresh = () => {
+      const f = P.hp / P.hpMax;
+      ovBarFill.width = Math.max(1, 50 * f);
+      ovBarFill.fillColor = hpColor(f);
+      for (const h of Object.values(this.huds)) if (h.visible) h.refresh();
+      window.dispatchEvent(new CustomEvent('hudchange'));
+    };
+    window.__setHud = (name) => {
+      for (const [k, h] of Object.entries(this.huds)) h.setVisible(k === name);
+      const dom = document.getElementById('hudReact');
+      if (dom) dom.style.display = name === 'react' ? 'block' : 'none';
+      if (this.huds[name]) this.huds[name].refresh();
+      try { localStorage.setItem('hud', name); } catch (e) {}
+      window.__markHud && window.__markHud(name);
+    };
+    this.setHp = (v) => {
+      P.hp = Math.max(0, Math.min(P.hpMax, Math.round(v)));
+      window.__hudRefresh();
+    };
+    this.time.addEvent({ delay: 1000, loop: true, callback: () => { // regen lenta
+      if (P.hp < P.hpMax) this.setHp(P.hp + 2);
+    } });
+    // ?hud=react|pixellab|kenney e ?hp=NN na URL sobrescrevem (QA/compartilhamento)
+    const qs = new URLSearchParams(location.search);
+    window.__setHud(qs.get('hud') || localStorage.getItem('hud') || 'react');
+    if (qs.get('hp')) this.setHp(parseInt(qs.get('hp'), 10));
+    window.__hudRefresh();
+
     this.keys = makeKeys(this);
     this.joy = new Joystick(this);
     new ActionButton(this, 'atk', attack);
@@ -526,32 +654,34 @@
       doll.iterate(c => c.setTint && c.setTint(0xff7070));
       this.time.delayedCall(130, () => doll.iterate(c => c.clearTint && c.clearTint()));
     };
-    this.mobStrike = (f) => { // investida do bicho na direção do player
-      f.lunging = true;
-      const dx = this.player.x - f.walker.x, dy = this.player.y - f.walker.y;
-      const len = Math.hypot(dx, dy) || 1;
-      this.tweens.add({
-        targets: f.cont, x: f.walker.x + (dx / len) * 16, y: f.walker.y + (dy / len) * 16,
-        duration: 110, yoyo: true,
-        onComplete: () => {
-          f.lunging = false;
-          f.cont.setPosition(Math.round(f.walker.x), Math.round(f.walker.y));
-        },
-      });
+    this.mobStrike = (f) => {
+      // investida VISUAL no sprite interno (o corpo/walker continua livre — sem congelar)
+      f.walker.setAnim('idle', dirBetween(f.walker, this.player)); // encara só no golpe
+      if (!f.lunging) {
+        f.lunging = true;
+        const dx = this.player.x - f.walker.x, dy = this.player.y - f.walker.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const bx = f.spr.x, by = f.spr.y;
+        this.tweens.add({
+          targets: f.spr, x: bx + (dx / len) * 16, y: by + (dy / len) * 16,
+          duration: 110, yoyo: true,
+          onComplete: () => { f.lunging = false; f.spr.setPosition(bx, by); },
+        });
+      }
       this.flashDoll();
+      this.setHp(this.P.hp - 3); // dano do golpe do bicho
     };
     window.__scene = this;
   }
 
   function update(time, delta) {
-    // --- combate automático: UMA distância por par decide os DOIS lados ---
-    const engaged = new Set();
+    // --- combate automático: UMA distância por par decide os DOIS lados.
+    // SEM CONGELAMENTO: atacar nunca trava movimento (nem do player nem dos bichos) —
+    // o fraco sempre pode fugir/desviar; o golpe anima por cima do deslocamento.
     let nearest = null, nearestD = Infinity;
     for (const f of this.foes) {
       const d = Math.hypot(f.walker.x - this.player.x, f.walker.y - this.player.y);
       if (d > COMBAT.range) continue; // fora da envergadura única: ninguém ataca
-      engaged.add(f.wander);          // bicho entra em combate: para de vagar e encara
-      if (!f.lunging) f.walker.setAnim('idle', dirBetween(f.walker, this.player));
       if (time - f.last >= COMBAT.mobCdMs) { f.last = time; this.mobStrike(f); }
       if (d < nearestD) { nearestD = d; nearest = f; }
     }
@@ -565,8 +695,8 @@
         this.time.delayedCall(130, () => alvo.spr.clearTint());
       });
     }
-    if (!this.P.attacking) this.player.update(keyboardVec(this.keys) || this.joy.vec, delta);
-    this.mobs.forEach(m => { if (!engaged.has(m)) m.update(delta); });
+    this.player.update(keyboardVec(this.keys) || this.joy.vec, delta);
+    this.mobs.forEach(m => m.update(delta));
   }
 
   new Phaser.Game({
