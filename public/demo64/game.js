@@ -598,12 +598,15 @@
       window.dispatchEvent(new CustomEvent('hudchange'));
     };
     window.__setHud = (name) => {
+      const isCanvas = !!this.huds[name]; // 'kenney' vive no canvas; o resto é React DOM
       for (const [k, h] of Object.entries(this.huds)) h.setVisible(k === name);
       const dom = document.getElementById('hudReact');
-      if (dom) dom.style.display = name === 'react' ? 'block' : 'none';
+      if (dom) dom.style.display = isCanvas ? 'none' : 'block';
+      if (!isCanvas) window.__hudTheme = name; // pergaminho | orbe | cristal
       if (this.huds[name]) this.huds[name].refresh();
       try { localStorage.setItem('hud', name); } catch (e) {}
       window.__markHud && window.__markHud(name);
+      window.dispatchEvent(new CustomEvent('hudchange'));
     };
     this.setHp = (v) => {
       P.hp = Math.max(0, Math.min(P.hpMax, Math.round(v)));
@@ -614,7 +617,7 @@
     } });
     // ?hud=react|pixellab|kenney e ?hp=NN na URL sobrescrevem (QA/compartilhamento)
     const qs = new URLSearchParams(location.search);
-    window.__setHud(qs.get('hud') || localStorage.getItem('hud') || 'react');
+    window.__setHud(qs.get('hud') || localStorage.getItem('hud') || 'pergaminho');
     if (qs.get('hp')) this.setHp(parseInt(qs.get('hp'), 10));
     window.__hudRefresh();
 
