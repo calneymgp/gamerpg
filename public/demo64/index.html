@@ -40,6 +40,38 @@
 #hudReact[data-theme="pergaminho"] .stat { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
 #hudReact[data-theme="pergaminho"] .stat img { width: 18px; height: 18px; }
 
+/* --- Tema 2: PAINEL (escuro estilo LootHunter: retrato + nível + 3 barras) --- */
+#hudReact[data-theme="painel"] .card {
+  width: 250px; padding: 8px 10px; display: flex; gap: 9px; align-items: center;
+  background: linear-gradient(160deg, #2a2018, #17110c);
+  border: 3px solid #b8862f; outline: 2px solid #120c07;
+  box-shadow: inset 0 0 0 2px #6b4f20, 0 3px 8px rgba(0,0,0,.5);
+  color: #e8dcc0; font-family: 'VT323', monospace;
+}
+#hudReact[data-theme="painel"] .av {
+  position: relative; width: 56px; height: 56px; flex: 0 0 56px;
+  border: 2px solid #b8862f; outline: 2px solid #120c07;
+  background: linear-gradient(160deg, #3a4a5a, #1a2530); box-shadow: inset 0 0 0 1px #6b4f20;
+}
+#hudReact[data-theme="painel"] .av img { width: 100%; height: 100%; object-fit: cover; }
+#hudReact[data-theme="painel"] .lvl {
+  position: absolute; left: -7px; bottom: -7px; min-width: 20px; height: 20px; padding: 0 3px;
+  background: radial-gradient(circle at 40% 35%, #f4d47a, #b8862f);
+  border: 2px solid #120c07; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+#hudReact[data-theme="painel"] .col { flex: 1; min-width: 0; }
+#hudReact[data-theme="painel"] .bar {
+  height: 13px; margin-top: 3px; position: relative;
+  background: #0e0a06; border: 1px solid #000; box-shadow: inset 0 0 0 1px #4a3818;
+  display: flex; align-items: center; justify-content: center;
+}
+#hudReact[data-theme="painel"] .fill { position: absolute; left: 0; top: 0; height: 100%; transition: width .25s; }
+#hudReact[data-theme="painel"] .fill.hp { background: linear-gradient(#e05a48, #b0271a); }
+#hudReact[data-theme="painel"] .fill.en { background: linear-gradient(#d9a92a, #9c7310); }
+#hudReact[data-theme="painel"] .fill.xp { background: linear-gradient(#66c24a, #3d8a2b); }
+#hudReact[data-theme="painel"] .barTxt { position: relative; z-index: 1; }
+
 #invToggle {
   position: fixed; top: 54px; right: 12px; z-index: 20;
   background: rgba(20,24,32,.85); color: #ffd76a;
@@ -164,8 +196,27 @@
         e('div', { className: 'stat' }, img('gem.png'), px('IDADE ' + d.idade, '#2c4a6a', 18))));
   }
 
+  // Painel escuro estilo LootHunter: retrato (sprite real) + badge de nível + 3 barras.
+  function Painel(d) {
+    const bar = (cls, val, max) =>
+      e('div', { className: 'bar' },
+        e('div', { className: 'fill ' + cls,
+          style: { width: Math.max(0, Math.min(1, val / max)) * 100 + '%' } }),
+        e('div', { className: 'barTxt' }, px(val + '/' + max, '#fff', 13)));
+    return e('div', { className: 'card' },
+      e('div', { className: 'av' },
+        d.portrait ? e('img', { src: d.portrait, alt: '' }) : null,
+        e('div', { className: 'lvl' }, px('' + d.nivel, '#2a1a06', 12))),
+      e('div', { className: 'col' },
+        px(d.nome, '#ffe08a', 18),
+        bar('hp', d.hp, d.hpMax),
+        bar('en', d.energia, d.energiaMax),
+        bar('xp', d.xp, d.xpMax)));
+  }
+
   function Hud() {
-    const [d, setD] = React.useState({ nome: 'Calney', hp: 100, hpMax: 100, gold: 125, idade: 10 });
+    const [d, setD] = React.useState({ nome: 'Calney', hp: 100, hpMax: 100,
+      energia: 80, energiaMax: 100, xp: 3250, xpMax: 6400, nivel: 5, gold: 125, idade: 10, portrait: null });
     React.useEffect(() => {
       const sync = () => { if (window.__hudData) setD(window.__hudData()); };
       window.addEventListener('hudchange', sync);
@@ -173,8 +224,8 @@
       return () => window.removeEventListener('hudchange', sync);
     }, []);
     const root = document.getElementById('hudReact');
-    if (root) root.dataset.theme = 'pergaminho';
-    return Pergaminho(d);
+    if (root) root.dataset.theme = 'painel';
+    return Painel(d);
   }
   // espera a fonte pixel antes de renderizar (senão o canvas mede errado)
   document.fonts.load('700 20px "Pixelify Sans"').then(() => {
@@ -229,6 +280,6 @@ addEventListener('keydown', e => {
   if (e.key === 'i' || e.key === 'I') document.getElementById('inv').classList.toggle('open');
 });
 </script>
-<script src="game.js?v=gobfix"></script>
+<script src="game.js?v=castelo"></script>
 </body>
 </html>

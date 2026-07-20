@@ -1,17 +1,21 @@
 /* Ilha de Elmsong 2.0 — 3 biomas, 15 monstros (CC0), paper doll LPC com inventário */
 (function () {
   const { FreeWalker, HomeWanderer, Joystick, ActionButton, keyboardVec, makeKeys } = RPGLab;
-  const TILE = 64, WORLD_W = 55, WORLD_H = 15, WORLD_X0 = -12;
+  const TILE = 64, WORLD_W = 55, WORLD_H = 15, WORLD_X0 = -25;
 
-  // --- mundo: 5 ilhas + pontes (villa em x negativo, à esquerda do campo) ---
+  // --- mundo: 6 ilhas + pontes (castelo e villa em x negativo, à esquerda do campo) ---
   const ISLES = {
+    castelo: { x: -24, y: 3, w: 10, h: 9, base: 0, titulo: 'CASTELO' },
     villa: { x: -11, y: 3, w: 10, h: 9, base: 0, titulo: 'VILLA' },
     campo: { x: 2, y: 3, w: 10, h: 9, base: 0, titulo: 'CAMPO' },
     deserto: { x: 15, y: 3, w: 10, h: 9, base: 5, titulo: 'DESERTO' },
     pedra: { x: 28, y: 3, w: 10, h: 9, base: null, titulo: 'PEDRA' },
     neve: { x: 41, y: 3, w: 10, h: 9, base: null, titulo: 'NEVE ✦ IA' },
   };
-  const BRIDGES = [[-1, 7], [0, 7], [1, 7], [12, 7], [13, 7], [14, 7], [25, 7], [26, 7], [27, 7], [38, 7], [39, 7], [40, 7]];
+  const BRIDGES = [[-14, 7], [-13, 7], [-12, 7], [-1, 7], [0, 7], [1, 7], [12, 7], [13, 7], [14, 7], [25, 7], [26, 7], [27, 7], [38, 7], [39, 7], [40, 7]];
+  // casa gerada por IA (ChatGPT) — 8×7.8 tiles, centrada no castelo. footprint bloqueado.
+  const AI_HOUSE = { cx: -19, by: 12, cells: [] };
+  for (let dx = -3; dx <= 3; dx++) for (let dy = 0; dy <= 3; dy++) AI_HOUSE.cells.push([-19 + dx, 11 - dy]);
   const TREES = [[4, 4], [9, 5], [3, 9]];
   const TREES_NEVE = [[43, 4], [48, 5], [44, 10], [49, 11], [46, 6]];
   const SPAWN = { x: 7, y: 7 };
@@ -29,7 +33,7 @@
     ['gobtower',  -8, 11, 2, 3, 8],
     ['gobhouse',  -4, 11, 2, 3, 0],
   ];
-  const blocked = new Set([...TREES, ...TREES_NEVE].map(([x, y]) => x + ',' + y));
+  const blocked = new Set([...TREES, ...TREES_NEVE, ...AI_HOUSE.cells].map(([x, y]) => x + ',' + y));
   // pegada de colisão: as 2 fileiras da base de cada construção
   for (const [, ax, ay, wt] of BUILDINGS)
     for (let dx = 0; dx < wt; dx++) for (let dy = 0; dy < 2; dy++) blocked.add((ax + dx) + ',' + (ay - dy));
@@ -125,6 +129,8 @@
     for (const b of ['castle', 'house', 'tower', 'gobhouse'])
       this.load.image('bld-' + b, A + 'buildings/' + b + '.png');
     this.load.spritesheet('bld-gobtower', A + 'buildings/gobtower.png', { frameWidth: 256, frameHeight: 192 });
+    this.load.image('casa-azul', A + 'buildings/casa_azul.png');       // gerada por IA (ChatGPT)
+    this.load.image('casa-azul-shadow', A + 'buildings/casa_azul_shadow.png');
     // --- creatures/ ---
     this.load.spritesheet('goblin', A + 'creatures/pedra/goblin_tocha/sheet.png', { frameWidth: 192, frameHeight: 192 });
     this.load.spritesheet('tnt', A + 'creatures/deserto/goblin_tnt/sheet.png', { frameWidth: 192, frameHeight: 192 });
@@ -206,11 +212,19 @@
       frames: this.anims.generateFrameNumbers('foam', { start: 0, end: 7 }) });
 
     for (const r of Object.values(ISLES)) foamRing(this, r);
+    paintRect(this, ISLES.castelo, 0, -80);
     paintRect(this, ISLES.villa, 0, -80);
     paintRect(this, ISLES.campo, 0, -80);
     paintRect(this, ISLES.deserto, 5, -80);
     paintStone(this, ISLES.pedra, -80);
     paintRect(this, ISLES.neve, 0, -80, 'snowflat');
+
+    // casa gerada por IA no bioma CASTELO (sombra no chão + sprite com depth pela base)
+    {
+      const hx = AI_HOUSE.cx * TILE + TILE / 2, hy = AI_HOUSE.by * TILE;
+      this.add.image(hx, hy - 6, 'casa-azul-shadow').setOrigin(0.5, 1).setDepth(hy - 60);
+      this.add.image(hx, hy, 'casa-azul').setOrigin(0.5, 1).setDepth(hy);
+    }
 
     // pontes (linha horizontal: frames 0,1,2 do sheet)
     BRIDGES.forEach(([x, y], i) => {
@@ -379,7 +393,8 @@
 
     // ------- player paper doll -------
     const P = this.P = { skin: 'lpc', armor: 'leather', weapon: 'longsword', mount: null, dir: 's', attacking: false,
-      nome: 'Calney', hp: 100, hpMax: 100, gold: 125, idade: 10 };
+      nome: 'Calney', hp: 100, hpMax: 100, gold: 125, idade: 10,
+      energia: 80, energiaMax: 100, xp: 3250, xpMax: 6400, nivel: 5 };
     const doll = this.add.container(0, 0);
     const mkLayer = () => this.add.sprite(0, 24, 'body-walk', 2 * 9).setScale(SCALE.player / 2);
     const layers = this.layers = {
@@ -564,6 +579,7 @@
         setMount(id === 'none' ? null : id);
       }
       if (!P.attacking) setDoll(this.player.moving ? 'walk' : 'idle', P.dir);
+      if ((kind === 'skin' || kind === 'armor') && this.__refreshPortrait) this.__refreshPortrait();
       window.__markEquipped && window.__markEquipped(kind, id);
     };
     if (window.__markEquipped) {
@@ -585,9 +601,34 @@
     }).setOrigin(0.5);
     doll.add([ovName]);
 
-    // — API de troca + refresh (HUD é 100% React no DOM: Pergaminho) —
+    // — retrato do herói: recorta o busto do frame parado-sul das camadas do paper doll —
+    const buildPortrait = () => {
+      const cv = document.createElement('canvas');
+      cv.width = 64; cv.height = 64;
+      const ctx = cv.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      if (P.skin === 'ai') {
+        ctx.drawImage(this.textures.get('aihero-idle').getSourceImage(), 20, 10, 52, 52, 0, 0, 64, 64);
+      } else {
+        const sy = 2 * 128;                          // frame 128, linha sul (parado)
+        const cx = 34, cy = 16, cw = 60, ch = 60;    // recorte do busto (cabeça+ombros)
+        for (const c of ['body', 'legs', TORSOS[P.armor], 'head', 'hair']) {
+          const key = c + '-walk';
+          if (!this.textures.exists(key)) continue;
+          ctx.drawImage(this.textures.get(key).getSourceImage(), cx, sy + cy, cw, ch, 0, 0, 64, 64);
+        }
+      }
+      return cv.toDataURL();
+    };
+    let portrait = buildPortrait();
+    this.__refreshPortrait = () => { portrait = buildPortrait(); window.__hudRefresh(); };
+
+    // — API de troca + refresh (HUD é 100% React no DOM) —
     this.huds = {};
-    window.__hudData = () => ({ nome: P.nome, hp: P.hp, hpMax: P.hpMax, gold: P.gold, idade: P.idade });
+    window.__hudData = () => ({
+      nome: P.nome, hp: P.hp, hpMax: P.hpMax, energia: P.energia, energiaMax: P.energiaMax,
+      xp: P.xp, xpMax: P.xpMax, nivel: P.nivel, gold: P.gold, idade: P.idade, portrait,
+    });
     window.__hudRefresh = () => { window.dispatchEvent(new CustomEvent('hudchange')); };
     this.setHp = (v) => {
       P.hp = Math.max(0, Math.min(P.hpMax, Math.round(v)));
