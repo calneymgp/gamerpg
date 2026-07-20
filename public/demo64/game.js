@@ -24,6 +24,18 @@
   // --- escalas (ajuste fino de proporção vs cenário) ---
   const SCALE = { player: 1.6, mob: 1.6, goblin: 0.8, sheep: 0.85 };
 
+  // --- combate automático ---
+  // REGRA ABSOLUTA DE SIMETRIA: existe UMA envergadura global, e a MESMA distância
+  // (entre centros dos walkers, calculada uma única vez por par/frame) decide o ataque
+  // dos dois lados. Se o player alcança o bicho, o bicho alcança o player — sempre.
+  const COMBAT = { range: 78, playerCdMs: 900, mobCdMs: 1100 };
+  const DIRN = { '1,0': 'e', '-1,0': 'w', '0,1': 's', '0,-1': 'n',
+                 '1,1': 'se', '1,-1': 'ne', '-1,1': 'sw', '-1,-1': 'nw' };
+  const dirBetween = (from, to) => {
+    const q = RPGLab.quantize({ x: to.x - from.x, y: to.y - from.y }, 8);
+    return DIRN[q.dx + ',' + q.dy];
+  };
+
   // --- paper doll ---
   const ROWS = { n: 0, w: 1, s: 2, e: 3 };
   const COLS = { walk: 9, slash: 6, thrust: 8 };
@@ -38,6 +50,19 @@
     spear: [['walk', '', 64], ['walk_behind', '', 64], ['thrust', '', 64], ['thrust_behind', '', 64]],
   };
   const ATTACK_ANIM = { longsword: 'slash', dagger: 'slash', mace: 'slash', waraxe: 'slash', spear: 'thrust' };
+
+  // --- montarias LPC (cavalo em 2 camadas: atrás → cavaleiro cortado na cintura → frente) ---
+  const MOUNTS = ['marrom', 'preto', 'cinza', 'dourado', 'branco'];
+  // modX/modY do cavaleiro por ciclo/direção/frame (tabela do [LPC] Horse Riding 0.9)
+  const RIDE_OFF = {
+    stand: { n: [[0, -23]], w: [[-3, -28]], s: [[0, -21]], e: [[3, -28]] },
+    gallop: {
+      n: [[0, -22], [0, -23], [0, -26], [0, -24]],
+      w: [[-2, -32], [-2, -28], [-7, -24], [-5, -26]],
+      s: [[0, -21], [0, -22], [0, -25], [0, -23]],
+      e: [[2, -32], [2, -28], [7, -24], [5, -26]],
+    },
+  };
 
   // --- monstros Pixel Adventure (upscalados 2x → frame nativo × 2 no load): ---
   //     [nome, 'bioma/pasta', fwNativo, fhNativo, temWalk, célula]
@@ -94,6 +119,13 @@
     for (const [w, files] of Object.entries(WEAPON_FILES)) {
       for (const [anim, , fs] of files) {
         this.load.spritesheet(`w-${w}-${anim}`, `${A}player/equip/weapon_${w}/${anim}.png`, { frameWidth: fs * 2, frameHeight: fs * 2 });
+      }
+    }
+    for (const m of MOUNTS) { // cavalos upscalados 2x: frames 128 nativos → 256
+      for (const cyc of ['stand', 'gallop']) {
+        for (const l of ['b', 'f']) {
+          this.load.spritesheet(`mt-${m}-${cyc}${l}`, `${A}player/mount/${m}/${cyc}_${l}.png`, { frameWidth: 256, frameHeight: 256 });
+        }
       }
     }
     this.load.spritesheet('aihero-idle', A + 'player/hero_ia/idle.png', { frameWidth: 92, frameHeight: 92 });
@@ -205,6 +237,7 @@
         frames: this.anims.generateFrameNumbers(sheet, { start: s, end: e }) });
     };
     this.mobs = [];
+    this.foes = []; // combatentes do auto-ataque (ovelhas ficam de fora)
     const spawnMob = (nome, texIdle, texWalk, cell, zone, opts = {}) => {
       const cont = this.add.container(0, 0);
       const spr = this.add.sprite(0, opts.dy ?? 26, texIdle, 0).setOrigin(0.5, 1).setScale(opts.scale ?? SCALE.mob / 2);
@@ -225,7 +258,9 @@
           cont.setDepth(cont.y);
         },
       });
-      this.mobs.push(new HomeWanderer(this, walker, { radius: opts.radius ?? 150 }));
+      const wander = new HomeWanderer(this, walker, { radius: opts.radius ?? 150 });
+      this.mobs.push(wander);
+      this.foes.push({ walker, spr, cont, wander, last: 0, lunging: false });
     };
     for (const [nome, path, , , hasWalk, cell] of MOBS) {
       const biome = path.split('/')[0];
@@ -251,7 +286,9 @@
           cont.setDepth(cont.y);
         },
       });
-      this.mobs.push(new HomeWanderer(this, walker, { radius: 150 }));
+      const wander = new HomeWanderer(this, walker, { radius: 150 });
+      this.mobs.push(wander);
+      this.foes.push({ walker, spr, cont, wander, last: 0, lunging: false });
     };
     spawnGoblin('Goblin Tocha', 'goblin', [36, 6], ISLES.pedra);
     spawnGoblin('Goblin TNT', 'tnt', [23, 4], ISLES.deserto);
@@ -274,7 +311,9 @@
           cont.setDepth(cont.y);
         },
       });
-      this.mobs.push(new HomeWanderer(this, walker, { radius: 165 }));
+      const wander = new HomeWanderer(this, walker, { radius: 165 });
+      this.mobs.push(wander);
+      this.foes.push({ walker, spr, cont, wander, last: 0, lunging: false });
     };
     spawnAIMob('Yeti ✦IA', 'aiyeti', [43, 6], ISLES.neve);
     spawnAIMob('Golem de Gelo ✦IA', 'aigolem', [47, 9], ISLES.neve);
@@ -296,16 +335,21 @@
     });
 
     // ------- player paper doll -------
-    const P = this.P = { skin: 'lpc', armor: 'leather', weapon: 'longsword', dir: 's', attacking: false };
+    const P = this.P = { skin: 'lpc', armor: 'leather', weapon: 'longsword', mount: null, dir: 's', attacking: false };
     const doll = this.add.container(0, 0);
     const mkLayer = () => this.add.sprite(0, 24, 'body-walk', 2 * 9).setScale(SCALE.player / 2);
     const layers = this.layers = {
       wb: mkLayer(), body: mkLayer(), feet: mkLayer(), legs: mkLayer(),
       torso: mkLayer(), head: mkLayer(), hair: mkLayer(), wf: mkLayer(),
     };
+    // cavalo centrado no frame 64 do boneco: frame 128 → centro em (0, 24 - 32*K + 3)
+    const K = SCALE.player; // 1 px da arte original → px de mundo (2x no arquivo × 0.8 no render)
+    const mkMount = () => this.add.sprite(0, 24 - 32 * K + 3, 'mt-marrom-standf', 2)
+      .setScale(SCALE.player / 2).setVisible(false);
+    const mountB = mkMount(), mountF = mkMount();
     const aiSpr = this.aiSpr = this.add.sprite(0, 24, 'aihero-idle', 2)
       .setOrigin(0.5, 0.93).setVisible(false);
-    doll.add([...Object.values(layers), aiSpr]);
+    doll.add([mountB, ...Object.values(layers), aiSpr, mountF]);
     for (const [d, r] of Object.entries(ROWS)) {
       this.anims.create({ key: 'aihero-walk-' + d, frameRate: 11, repeat: -1,
         frames: this.anims.generateFrameNumbers('aihero-walk', { start: r * 6, end: r * 6 + 5 }) });
@@ -334,6 +378,45 @@
       return key;
     };
     const toCardinal = (dir) => dir.includes('w') ? 'w' : dir.includes('e') ? 'e' : dir;
+    const ensureMountAnim = (tex, row) => {
+      const key = `${tex}|${row}`;
+      if (!this.anims.exists(key)) {
+        this.anims.create({ key, frameRate: 11, repeat: -1,
+          frames: this.anims.generateFrameNumbers(tex, { start: row * 4, end: row * 4 + 3 }) });
+      }
+      return key;
+    };
+    // desloca o cavaleiro pro offset da sela (tabela RIDE_OFF, sincronizado com o frame do cavalo)
+    const applyRide = (cycle, d4, col) => {
+      const off = RIDE_OFF[cycle][d4];
+      const [mx, my] = off[col] || off[0];
+      for (const spr of Object.values(layers)) spr.setPosition(mx * K, 24 + my * K);
+    };
+    mountF.on('animationupdate', (anim, frame) => {
+      if (P.mount) applyRide('gallop', toCardinal(P.dir), frame.frame.name % 4);
+    });
+    let ridePose = null; // setAnim roda todo tick — só reposiciona o cavaleiro em mudança de pose
+    const renderMounted = (state, d4, row) => {
+      const cycle = state === 'walk' ? 'gallop' : 'stand';
+      for (const [spr, l] of [[mountB, 'b'], [mountF, 'f']]) {
+        const tex = `mt-${P.mount}-${cycle}${l}`;
+        spr.setVisible(true);
+        if (cycle === 'stand') { spr.anims.stop(); spr.setTexture(tex, row * 4); }
+        else spr.play(ensureMountAnim(tex, row), true);
+      }
+      // cavaleiro: pose parada, cortado na cintura (o cavalo em frente completa a perna)
+      for (const [name, spr] of Object.entries(layers)) {
+        const tex = texFor(name, 'walk');
+        if (name === 'wb' || name === 'wf' || !this.textures.exists(tex)) { spr.setVisible(false); continue; }
+        spr.setVisible(true);
+        spr.anims.stop();
+        spr.setTexture(tex, row * COLS.walk);
+        spr.setOrigin(0.5, 0.95);
+        spr.setCrop(0, 0, 128, 100);
+      }
+      const pose = cycle + '|' + d4;
+      if (ridePose !== pose) { ridePose = pose; applyRide(cycle, d4, 0); }
+    };
     const setDoll = this.setDoll = (state, dir) => {
       P.dir = dir;
       const d4 = toCardinal(dir);
@@ -347,6 +430,11 @@
         return;
       }
       aiSpr.setVisible(false);
+      if (P.mount) {
+        renderMounted(state, d4, row);
+        doll.setDepth(doll.y);
+        return;
+      }
       const anim = state === 'attack' ? ATTACK_ANIM[P.weapon] : 'walk';
       for (const [name, spr] of Object.entries(layers)) {
         const tex = texFor(name, anim);
@@ -371,11 +459,11 @@
 
     const attack = () => {
       if (P.attacking) return;
-      if (P.skin === 'ai') {
-        // herói IA não tem anim de ataque — investida rápida como feedback
+      if (P.skin === 'ai' || P.mount) {
+        // sem anim de ataque (herói IA / montado) — investida rápida como feedback
         P.attacking = true;
-        this.tweens.add({ targets: aiSpr, scaleX: 1.18, scaleY: 0.92, duration: 90,
-          yoyo: true, onComplete: () => { P.attacking = false; } });
+        this.tweens.add({ targets: P.mount ? doll : aiSpr, scaleX: 1.18, scaleY: 0.92,
+          duration: 90, yoyo: true, onComplete: () => { P.attacking = false; } });
         return;
       }
       P.attacking = true;
@@ -386,10 +474,32 @@
       });
     };
 
+    const setMount = (m) => {
+      P.mount = m;
+      ridePose = null;
+      this.player.speed = m ? 260 : 165; // galope
+      this.player.radius = m ? 16 : 12;
+      if (!m) {
+        mountB.setVisible(false); mountF.setVisible(false);
+        for (const spr of Object.values(layers)) { spr.setCrop(); spr.setPosition(0, 24); }
+      }
+    };
     window.__equip = (kind, id) => {
       if (kind === 'weapon') P.weapon = id;
       else if (kind === 'armor') P.armor = id;
-      else if (kind === 'skin') P.skin = id.replace('skin_', '');
+      else if (kind === 'skin') {
+        P.skin = id.replace('skin_', '');
+        if (P.skin === 'ai' && P.mount) { // herói IA não cavalga os frames LPC
+          setMount(null);
+          window.__markEquipped && window.__markEquipped('mount', 'none');
+        }
+      } else if (kind === 'mount') {
+        if (id !== 'none' && P.skin === 'ai') {
+          P.skin = 'lpc';
+          window.__markEquipped && window.__markEquipped('skin', 'skin_lpc');
+        }
+        setMount(id === 'none' ? null : id);
+      }
       if (!P.attacking) setDoll(this.player.moving ? 'walk' : 'idle', P.dir);
       window.__markEquipped && window.__markEquipped(kind, id);
     };
@@ -397,6 +507,7 @@
       window.__markEquipped('weapon', P.weapon);
       window.__markEquipped('armor', P.armor);
       window.__markEquipped('skin', 'skin_' + P.skin);
+      window.__markEquipped('mount', 'none');
     }
 
     const cam = this.cameras.main;
@@ -407,12 +518,55 @@
     this.joy = new Joystick(this);
     new ActionButton(this, 'atk', attack);
     this.keys.space.on('down', attack);
+
+    // --- ganchos do combate automático ---
+    this.autoAttack = attack;
+    this.lastPlayerAtk = 0;
+    this.flashDoll = () => { // player levou golpe
+      doll.iterate(c => c.setTint && c.setTint(0xff7070));
+      this.time.delayedCall(130, () => doll.iterate(c => c.clearTint && c.clearTint()));
+    };
+    this.mobStrike = (f) => { // investida do bicho na direção do player
+      f.lunging = true;
+      const dx = this.player.x - f.walker.x, dy = this.player.y - f.walker.y;
+      const len = Math.hypot(dx, dy) || 1;
+      this.tweens.add({
+        targets: f.cont, x: f.walker.x + (dx / len) * 16, y: f.walker.y + (dy / len) * 16,
+        duration: 110, yoyo: true,
+        onComplete: () => {
+          f.lunging = false;
+          f.cont.setPosition(Math.round(f.walker.x), Math.round(f.walker.y));
+        },
+      });
+      this.flashDoll();
+    };
     window.__scene = this;
   }
 
   function update(time, delta) {
+    // --- combate automático: UMA distância por par decide os DOIS lados ---
+    const engaged = new Set();
+    let nearest = null, nearestD = Infinity;
+    for (const f of this.foes) {
+      const d = Math.hypot(f.walker.x - this.player.x, f.walker.y - this.player.y);
+      if (d > COMBAT.range) continue; // fora da envergadura única: ninguém ataca
+      engaged.add(f.wander);          // bicho entra em combate: para de vagar e encara
+      if (!f.lunging) f.walker.setAnim('idle', dirBetween(f.walker, this.player));
+      if (time - f.last >= COMBAT.mobCdMs) { f.last = time; this.mobStrike(f); }
+      if (d < nearestD) { nearestD = d; nearest = f; }
+    }
+    if (nearest && !this.P.attacking && time - this.lastPlayerAtk >= COMBAT.playerCdMs) {
+      this.lastPlayerAtk = time;
+      this.P.dir = dirBetween(this.player, nearest.walker); // encara o alvo
+      this.autoAttack();
+      const alvo = nearest; // flash no meio do golpe
+      this.time.delayedCall(200, () => {
+        alvo.spr.setTint(0xff7070);
+        this.time.delayedCall(130, () => alvo.spr.clearTint());
+      });
+    }
     if (!this.P.attacking) this.player.update(keyboardVec(this.keys) || this.joy.vec, delta);
-    this.mobs.forEach(m => m.update(delta));
+    this.mobs.forEach(m => { if (!engaged.has(m)) m.update(delta); });
   }
 
   new Phaser.Game({

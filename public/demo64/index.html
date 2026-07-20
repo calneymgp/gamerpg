@@ -40,8 +40,8 @@
 <body>
 <div class="hud">
   <a href="../">← Hub</a>
-  <span class="chip"><b>64×64</b> · 4 biomas · 18 monstros · paper doll · bioma NEVE por IA</span>
-  <span class="hint">WASD/setas · espaço ataca · I abre inventário</span>
+  <span class="chip"><b>64×64</b> · 4 biomas · 18 monstros · paper doll · montarias · bioma NEVE por IA</span>
+  <span class="hint">WASD/setas · ataque automático ao aproximar · I abre inventário</span>
 </div>
 <button id="invToggle">🎒 Inventário</button>
 <div id="inv">
@@ -51,10 +51,12 @@
   <div class="slots" id="slotsW"></div>
   <h3>Armaduras</h3>
   <div class="slots" id="slotsA"></div>
+  <h3>Montarias</h3>
+  <div class="slots" id="slotsM"></div>
 </div>
 <div id="game"></div>
 <script src="../vendor/phaser.min.js"></script>
-<script src="../shared/engine.js?v=pedra2"></script>
+<script src="../shared/engine.js?v=combate"></script>
 <script>
 // inventário DOM — conversa com o jogo via window.__equip
 const WEAPONS_UI = [
@@ -65,13 +67,19 @@ const ARMORS_UI = [
   ['shirt', 'Camisa'], ['leather', 'Couro'], ['chain', 'Cota de malha'],
   ['legion', 'Legião'], ['plate', 'Placas'],
 ];
+const MOUNTS_UI = [
+  ['none', 'A pé', 'dismount'],
+  ['marrom', 'Marrom', 'horse_marrom'], ['preto', 'Preto', 'horse_preto'],
+  ['cinza', 'Cinza', 'horse_cinza'], ['dourado', 'Dourado', 'horse_dourado'],
+  ['branco', 'Branco', 'horse_branco'],
+];
 function buildSlots(elId, items, kind) {
   const el = document.getElementById(elId);
-  for (const [id, label] of items) {
+  for (const [id, label, icon] of items) {
     const b = document.createElement('div');
     b.className = 'slot';
     b.dataset.id = id;
-    b.innerHTML = `<img src="../assets/64/ui/icons/${id}.png" alt=""><span>${label}</span>`;
+    b.innerHTML = `<img src="../assets/64/ui/icons/${icon || id}.png" alt=""><span>${label}</span>`;
     b.onclick = () => {
       window.__equip && window.__equip(kind, id);
       el.querySelectorAll('.slot').forEach(s => s.classList.toggle('sel', s === b));
@@ -82,16 +90,18 @@ function buildSlots(elId, items, kind) {
 buildSlots('slotsS', [['skin_lpc', 'Herói LPC'], ['skin_ai', 'Cavaleiro IA ✦']], 'skin');
 buildSlots('slotsW', WEAPONS_UI, 'weapon');
 buildSlots('slotsA', ARMORS_UI, 'armor');
+buildSlots('slotsM', MOUNTS_UI, 'mount');
 document.getElementById('invToggle').onclick = () =>
   document.getElementById('inv').classList.toggle('open');
 window.__markEquipped = (kind, id) => {
-  const el = document.getElementById(kind === 'weapon' ? 'slotsW' : kind === 'skin' ? 'slotsS' : 'slotsA');
+  const el = document.getElementById(
+    kind === 'weapon' ? 'slotsW' : kind === 'skin' ? 'slotsS' : kind === 'mount' ? 'slotsM' : 'slotsA');
   el.querySelectorAll('.slot').forEach(s => s.classList.toggle('sel', s.dataset.id === id));
 };
 addEventListener('keydown', e => {
   if (e.key === 'i' || e.key === 'I') document.getElementById('inv').classList.toggle('open');
 });
 </script>
-<script src="game.js?v=pedra2"></script>
+<script src="game.js?v=montaria"></script>
 </body>
 </html>
