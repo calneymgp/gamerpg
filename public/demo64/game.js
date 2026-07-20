@@ -1,16 +1,17 @@
 /* Ilha de Elmsong 2.0 — 3 biomas, 15 monstros (CC0), paper doll LPC com inventário */
 (function () {
   const { FreeWalker, HomeWanderer, Joystick, ActionButton, keyboardVec, makeKeys } = RPGLab;
-  const TILE = 64, WORLD_W = 55, WORLD_H = 15;
+  const TILE = 64, WORLD_W = 55, WORLD_H = 15, WORLD_X0 = -12;
 
-  // --- mundo: 4 ilhas + pontes ---
+  // --- mundo: 5 ilhas + pontes (villa em x negativo, à esquerda do campo) ---
   const ISLES = {
+    villa: { x: -11, y: 3, w: 10, h: 9, base: 0, titulo: 'VILLA' },
     campo: { x: 2, y: 3, w: 10, h: 9, base: 0, titulo: 'CAMPO' },
     deserto: { x: 15, y: 3, w: 10, h: 9, base: 5, titulo: 'DESERTO' },
     pedra: { x: 28, y: 3, w: 10, h: 9, base: null, titulo: 'PEDRA' },
     neve: { x: 41, y: 3, w: 10, h: 9, base: null, titulo: 'NEVE ✦ IA' },
   };
-  const BRIDGES = [[12, 7], [13, 7], [14, 7], [25, 7], [26, 7], [27, 7], [38, 7], [39, 7], [40, 7]];
+  const BRIDGES = [[-1, 7], [0, 7], [1, 7], [12, 7], [13, 7], [14, 7], [25, 7], [26, 7], [27, 7], [38, 7], [39, 7], [40, 7]];
   const TREES = [[4, 4], [9, 5], [3, 9]];
   const TREES_NEVE = [[43, 4], [48, 5], [44, 10], [49, 11], [46, 6]];
   const SPAWN = { x: 7, y: 7 };
@@ -19,7 +20,19 @@
   const onLand = (tx, ty) =>
     Object.values(ISLES).some(r => inRect(r, tx, ty)) ||
     BRIDGES.some(([bx, by]) => bx === tx && by === ty);
+  // construções Tiny Swords Update 010 (CC0) — 64px nativo, escala 1:1 com o tile.
+  //   [tex, ax, ay, wt, ht, frames]: (ax,ay) = canto inf-esq em tiles; a arte sobe ht tiles.
+  const BUILDINGS = [
+    ['castle',   -11,  7, 5, 4, 0],
+    ['house',     -5,  6, 2, 3, 0],
+    ['tower',    -11, 11, 2, 4, 0],
+    ['gobtower',  -8, 11, 2, 3, 8],
+    ['gobhouse',  -4, 11, 2, 3, 0],
+  ];
   const blocked = new Set([...TREES, ...TREES_NEVE].map(([x, y]) => x + ',' + y));
+  // pegada de colisão: as 2 fileiras da base de cada construção
+  for (const [, ax, ay, wt] of BUILDINGS)
+    for (let dx = 0; dx < wt; dx++) for (let dy = 0; dy < 2; dy++) blocked.add((ax + dx) + ',' + (ay - dy));
 
   // --- escalas (ajuste fino de proporção vs cenário) ---
   const SCALE = { player: 1.6, mob: 1.6, goblin: 0.8, sheep: 0.85 };
@@ -108,6 +121,10 @@
       const n = String(i).padStart(2, '0');
       this.load.image('deco' + n, A + 'props/deco/' + n + '.png');
     }
+    // --- buildings/ (Tiny Swords Update 010, CC0) ---
+    for (const b of ['castle', 'house', 'tower', 'gobhouse'])
+      this.load.image('bld-' + b, A + 'buildings/' + b + '.png');
+    this.load.spritesheet('bld-gobtower', A + 'buildings/gobtower.png', { frameWidth: 128, frameHeight: 192 });
     // --- creatures/ ---
     this.load.spritesheet('goblin', A + 'creatures/pedra/goblin_tocha/sheet.png', { frameWidth: 192, frameHeight: 192 });
     this.load.spritesheet('tnt', A + 'creatures/deserto/goblin_tnt/sheet.png', { frameWidth: 192, frameHeight: 192 });
@@ -183,12 +200,13 @@
 
   function create() {
     const scene = this;
-    const W = WORLD_W * TILE, H = WORLD_H * TILE;
-    this.add.tileSprite(0, 0, W, H, 'water').setOrigin(0).setDepth(-100);
+    const W = WORLD_W * TILE, H = WORLD_H * TILE, X0 = WORLD_X0 * TILE, FULLW = W - X0;
+    this.add.tileSprite(X0, 0, FULLW, H, 'water').setOrigin(0).setDepth(-100);
     this.anims.create({ key: 'foam', frameRate: 9, repeat: -1,
       frames: this.anims.generateFrameNumbers('foam', { start: 0, end: 7 }) });
 
     for (const r of Object.values(ISLES)) foamRing(this, r);
+    paintRect(this, ISLES.villa, 0, -80);
     paintRect(this, ISLES.campo, 0, -80);
     paintRect(this, ISLES.deserto, 5, -80);
     paintStone(this, ISLES.pedra, -80);
@@ -236,6 +254,16 @@
     deco(ISLES.pedra, ['09', '10', '11'], 6);
     [[13.5, 10], [26.5, 4]].forEach(([x, y]) =>
       this.add.sprite(x * TILE, y * TILE, 'rocks1', 0).setDepth(-86));
+
+    // construções da villa (origin no canto inf-esq; depth pela base p/ sobrepor com o player)
+    this.anims.create({ key: 'gobtower-idle', frameRate: 6, repeat: -1,
+      frames: this.anims.generateFrameNumbers('bld-gobtower', { start: 0, end: 7 }) });
+    for (const [tex, ax, ay, , , frames] of BUILDINGS) {
+      const x = ax * TILE, y = (ay + 1) * TILE;
+      const img = frames ? this.add.sprite(x, y, 'bld-' + tex).play('gobtower-idle')
+                         : this.add.image(x, y, 'bld-' + tex);
+      img.setOrigin(0, 1).setDepth(y);
+    }
 
     const walkableBase = (tx, ty) => onLand(tx, ty) && !blocked.has(tx + ',' + ty);
     // versões pixel para o movimento livre
@@ -545,30 +573,21 @@
     }
 
     const cam = this.cameras.main;
-    cam.setBounds(0, 0, W, H);
+    cam.setBounds(X0, 0, FULLW, H);
     cam.startFollow(doll, true, 0.15, 0.15);
 
-    // ------- overhead do player: nome + barra de HP em cima do char (fonte pixel) -------
-    const ovName = this.add.text(0, -64, P.nome, {
-      fontFamily: '"Press Start 2P", monospace', fontSize: '9px',
-      color: '#ffd76a', stroke: '#000', strokeThickness: 3,
+    // ------- overhead do player: só o nome (barra de HP fica no HUD do canto) -------
+    // Pixelify Sans: pixel PORÉM legível, no nível do título dos biomas ("CAMPO").
+    const ovName = this.add.text(0, -52, P.nome, {
+      fontFamily: '"Pixelify Sans", sans-serif', fontSize: '16px', fontStyle: '700',
+      color: '#ffe08a', stroke: '#000', strokeThickness: 4,
     }).setOrigin(0.5);
-    const ovBarBg = this.add.rectangle(0, -48, 52, 8, 0x10131a, 1).setStrokeStyle(2, 0x000000, 1);
-    const ovBarFill = this.add.rectangle(-24, -48, 48, 4, 0x4ade80).setOrigin(0, 0.5);
-    doll.add([ovName, ovBarBg, ovBarFill]);
+    doll.add([ovName]);
 
-    // ------- HUDs chaveáveis (React no DOM; Kenney pixelado no canvas) -------
-    const hpColor = (f) => (f > 0.5 ? 0x4ade80 : f > 0.25 ? 0xfbbf24 : 0xef4444);
-
-    // — API de troca + refresh (HUD é 100% React no DOM: Pergaminho / Cristal) —
+    // — API de troca + refresh (HUD é 100% React no DOM: Pergaminho) —
     this.huds = {};
     window.__hudData = () => ({ nome: P.nome, hp: P.hp, hpMax: P.hpMax, gold: P.gold, idade: P.idade });
-    window.__hudRefresh = () => { // HUD único: Pergaminho (React DOM). Avisa o React via evento.
-      const f = P.hp / P.hpMax;
-      ovBarFill.width = Math.max(1, 50 * f);
-      ovBarFill.fillColor = hpColor(f);
-      window.dispatchEvent(new CustomEvent('hudchange'));
-    };
+    window.__hudRefresh = () => { window.dispatchEvent(new CustomEvent('hudchange')); };
     this.setHp = (v) => {
       P.hp = Math.max(0, Math.min(P.hpMax, Math.round(v)));
       window.__hudRefresh();
@@ -637,12 +656,12 @@
     this.mobs.forEach(m => m.update(delta));
   }
 
-  // espera a fonte pixel antes de subir o jogo (textos do canvas usam Press Start 2P)
+  // espera a fonte pixel antes de subir o jogo (nomes usam Pixelify Sans)
   const boot = () => new Phaser.Game({
     type: Phaser.AUTO, parent: 'game', backgroundColor: '#4a90c4',
     pixelArt: true, roundPixels: true,
     scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
     scene: { preload, create, update },
   });
-  document.fonts.load('10px "Press Start 2P"').then(boot, boot);
+  document.fonts.load('700 16px "Pixelify Sans"').then(boot, boot);
 })();
