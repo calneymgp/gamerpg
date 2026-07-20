@@ -109,13 +109,20 @@
     }
   }
 
-  // pedra usa o bloco 4×4 do Tilemap_Elevation: col 0=oeste, 3=leste, 1/2=miolo;
-  // linha 0=norte, 3=sul (borda contornada de baixo), 1/2=miolo. frame = linha*4 + col
+  // Tilemap_Elevation: platô 3×3 nas linhas 0-2 (col 0=oeste, 1=miolo, 2=leste) e
+  // linha 3 = face do penhasco, desenhada UMA LINHA ABAIXO da ilha (sobre a água).
   function paintStone(scene, rect, depth) {
     for (let y = 0; y < rect.h; y++) for (let x = 0; x < rect.w; x++) {
-      const col = x === 0 ? 0 : (x === rect.w - 1 ? 3 : 1 + (x % 2));
-      const row = y === 0 ? 0 : (y === rect.h - 1 ? 3 : 1 + (y % 2));
+      const col = x === 0 ? 0 : (x === rect.w - 1 ? 2 : 1);
+      const row = y === 0 ? 0 : (y === rect.h - 1 ? 2 : 1);
       scene.add.image((rect.x + x) * TILE, (rect.y + y) * TILE, 'elev', row * 4 + col)
+        .setOrigin(0).setDepth(depth);
+    }
+    for (let x = 0; x < rect.w; x++) {
+      const col = x === 0 ? 0 : (x === rect.w - 1 ? 2 : 1);
+      scene.add.sprite((rect.x + x) * TILE + 32, (rect.y + rect.h) * TILE + 32, 'foam')
+        .setDepth(-90).play({ key: 'foam', startFrame: x % 8 });
+      scene.add.image((rect.x + x) * TILE, (rect.y + rect.h) * TILE, 'elev', 12 + col)
         .setOrigin(0).setDepth(depth);
     }
   }
