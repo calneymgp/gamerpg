@@ -124,7 +124,7 @@
     // --- buildings/ (Tiny Swords Update 010, CC0) ---
     for (const b of ['castle', 'house', 'tower', 'gobhouse'])
       this.load.image('bld-' + b, A + 'buildings/' + b + '.png');
-    this.load.spritesheet('bld-gobtower', A + 'buildings/gobtower.png', { frameWidth: 128, frameHeight: 192 });
+    this.load.spritesheet('bld-gobtower', A + 'buildings/gobtower.png', { frameWidth: 256, frameHeight: 192 });
     // --- creatures/ ---
     this.load.spritesheet('goblin', A + 'creatures/pedra/goblin_tocha/sheet.png', { frameWidth: 192, frameHeight: 192 });
     this.load.spritesheet('tnt', A + 'creatures/deserto/goblin_tnt/sheet.png', { frameWidth: 192, frameHeight: 192 });
@@ -256,8 +256,9 @@
       this.add.sprite(x * TILE, y * TILE, 'rocks1', 0).setDepth(-86));
 
     // construções da villa (origin no canto inf-esq; depth pela base p/ sobrepor com o player)
+    // gobtower.png = 1024×192 = 4 frames de 256px (NÃO 8 de 128 — os pares ficavam vazios e piscava)
     this.anims.create({ key: 'gobtower-idle', frameRate: 6, repeat: -1,
-      frames: this.anims.generateFrameNumbers('bld-gobtower', { start: 0, end: 7 }) });
+      frames: this.anims.generateFrameNumbers('bld-gobtower', { start: 0, end: 3 }) });
     for (const [tex, ax, ay, , , frames] of BUILDINGS) {
       const x = ax * TILE, y = (ay + 1) * TILE;
       const img = frames ? this.add.sprite(x, y, 'bld-' + tex).play('gobtower-idle')
