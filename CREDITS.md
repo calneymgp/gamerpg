@@ -30,6 +30,17 @@ Este repositório usa apenas assets gratuitos de terceiros. Downloads brutos em 
     Michael Whitlock "bigbeargames", Matthew Krohn "makrohn", Lanea Zimmerman "Sharm",
     entre outros). Derivados devem manter share-alike.
 
+### Montarias (cavalos)
+- **"[LPC] Horses"** — bluecarrot16. 5 cores (marrom, preto, cinza, dourado, branco),
+  ciclos stand/walk/gallop/eat em 4 direções.
+  - Fonte: https://opengameart.org/content/lpc-horses
+  - Licença: **CC-BY 3.0 / GPL 3.0 / GPL 2.0 / OGA-BY 3.0** — creditar bluecarrot16 e
+    linkar a página acima.
+- **"[LPC] Horse Riding"** (recorte em camadas atrás/frente para encaixar o cavaleiro) —
+  derivado dos cavalos do bluecarrot16 pelo autor do asset (não exige crédito próprio).
+  - Fonte: https://opengameart.org/content/lpc-horse-riding-updated-091
+  - Pipeline: `scripts/build_mounts.py` (Scale2x 2×, mesmo esquema do paper doll).
+
 ### Bioma NEVE — assets gerados por IA (PixelLab)
 - **Tileset Wang de neve, pinheiro nevado, Cavaleiro de Gelo (herói), Yeti, Golem de Gelo
   e Lobo Ártico** — gerados via https://api.pixellab.ai (contas do projeto), 2026-07-19.

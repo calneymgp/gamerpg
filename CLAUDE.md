@@ -25,6 +25,9 @@ O usuário escolheu o 64×64 — demos 32/128 foram DELETADOS (zips brutos ainda
 - **Paper doll LPC**: personagem em camadas (weapon_behind → body → feet → legs → torso →
   head → weapon), 5 armas + 5 armaduras trocáveis via inventário DOM (🎒 / tecla I),
   visíveis andando e atacando. `window.__equip(kind, id)` é a ponte DOM→jogo.
+- **Montarias**: 5 cavalos LPC (marrom/preto/cinza/dourado/branco) equipáveis no
+  inventário; montado galopa a 260px/s (a pé 165), armas se recolhem, ataque vira
+  investida. Ver "Montarias LPC" no pipeline abaixo.
 
 Hub em `public/index.html`. Licenças em `CREDITS.md` (monstros CC0; LPC é CC-BY-SA!).
 
@@ -47,7 +50,7 @@ Assets organizados por bioma/tipo (`public/assets/64/`, tudo em escala 64px):
 terrain/    atlases de chão/água compartilhados (campo_deserto, pedra, neve, water, foam, bridge)
 props/      árvores (tree_campo, tree_neve) + deco/
 creatures/{campo,deserto,pedra,neve,common}/<nome>/{idle,walk}.png
-player/     equip/ (paper doll LPC 2×) + hero_ia/ (skin Cavaleiro de Gelo IA)
+player/     equip/ (paper doll LPC 2×) + hero_ia/ (skin Cavaleiro de Gelo IA) + mount/ (cavalos 2×)
 ui/icons/   ícones do inventário
 _source/    NÃO runtime: lpc_64/ (originais) + ai_gen/ (pipeline PixelLab, state.json)
 ```
@@ -86,6 +89,16 @@ _source/    NÃO runtime: lpc_64/ (originais) + ai_gen/ (pipeline PixelLab, stat
   sem quota): `clecioespindola/godotPlatformer2D` (parcial) e
   `ChrisTutorials/ChrisTutorials-2D-Godot-Platformer` (pack completo em
   `Art/Pixel Adventure 2/Enemies/`). Frame size está no nome do arquivo: `Idle (36x30).png`.
+- **Montarias LPC** (`[LPC] Horse Riding 0.9.1` no OpenGameArt, cavalos do bluecarrot16,
+  CC-BY/OGA-BY — só crédito): zip com 5 pastas (1=cinza 2=dourado 3=marrom 4=preto
+  5=branco), cada uma com `{s,w,r,e}{b,f}.png` = stand/walk/gallop(r)/eat × atrás/frente,
+  512×512 = grade 4×4 de frames 128, linhas n/w/s/e. O cavaleiro é o paper doll normal:
+  sanduíche `b` → doll cortado no topo (50 dos 64px, `setCrop(0,0,128,100)` no sheet 2x)
+  → `f`; offsets modX/modY por ciclo/frame/direção no `modvalues.zip` (copiados em
+  `RIDE_OFF` no game.js). Camada `b` só existe nas linhas n/s (de lado o cavalo inteiro
+  é foreground com furo recortado pro cavaleiro). Cavalo 128 centrado no frame 64 do
+  doll deixa os cascos na linha dos pés (~2px de ajuste). Pipeline `scripts/build_mounts.py`
+  (Scale2x 2×, zip cacheado em `assets/lpc_ride/`).
 - **PixelLab API** (api.pixellab.ai/v2, keys em `.env`, roteador `scripts/pixellab-route.py`,
   pipeline idempotente `scripts/gen_neve.py` com estado em `public/assets/64/ai/state.json`):
   - POSTs async retornam **202** com `*_id`; poll em `GET /tilesets/{id}`, `/characters/{id}`,
