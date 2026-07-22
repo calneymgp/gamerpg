@@ -13,11 +13,12 @@ Estrutura final:
 import os
 import re
 import shutil
+from pathlib import Path
 import numpy as np
 from PIL import Image
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-A = os.path.join(ROOT, 'public/assets/64')
+BASE = Path(__file__).resolve().parent.parent
+A = BASE / 'public/assets/64'
 
 
 def scale2x_img(img):
@@ -130,7 +131,7 @@ for f in os.listdir(f'{A}/icons'):
 shutil.copytree(f'{A}/lpc', f'{N}/_source/lpc_64')   # originais 64px do paper doll (upscale reprodutível)
 shutil.copytree(f'{A}/ai', f'{N}/_source/ai_gen')    # estado/raw/wang/sheets do PixelLab (gen_neve.py)
 
-print('árvore nova montada em', os.path.relpath(N, ROOT))
+print('árvore nova montada em', os.path.relpath(N, BASE))
 # resumo
 for d in sorted(os.listdir(N)):
     nfiles = sum(len(fs) for _, _, fs in os.walk(f'{N}/{d}'))

@@ -2,12 +2,13 @@
 """Upscale 2x das camadas LPC via Scale2x (AdvMAME2x) — preserva alpha e alinhamento.
 Gera public/assets/64/lpc2x/ espelhando public/assets/64/lpc/."""
 import os
+from pathlib import Path
 import numpy as np
 from PIL import Image
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(ROOT, 'public/assets/64/lpc')
-DST = os.path.join(ROOT, 'public/assets/64/lpc2x')
+BASE = Path(__file__).resolve().parent.parent
+SRC = BASE / 'public/assets/64/lpc'
+DST = BASE / 'public/assets/64/lpc2x'
 
 
 def scale2x(img):
@@ -46,4 +47,4 @@ for dirpath, _, files in os.walk(SRC):
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         scale2x(Image.open(os.path.join(dirpath, f))).save(dst)
         count += 1
-print(f'{count} sheets upscaled 2x -> {os.path.relpath(DST, ROOT)}')
+print(f'{count} sheets upscaled 2x -> {os.path.relpath(DST, BASE)}')

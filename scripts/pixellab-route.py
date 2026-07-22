@@ -5,12 +5,14 @@ import json
 import os
 import sys
 import urllib.request
+from pathlib import Path
 
+BASE = Path(__file__).resolve().parent.parent
 API = 'https://api.pixellab.ai/v2'
 
 
 def load_env(path=None):
-    path = path or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env')
+    path = path or (BASE / '.env')
     env = {}
     if os.path.exists(path):
         for ln in open(path):

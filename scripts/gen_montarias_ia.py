@@ -11,12 +11,13 @@ import os
 import sys
 import time
 import urllib.request
+from pathlib import Path
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-AI = os.path.join(ROOT, 'public/assets/64/_source/ai_gen')
-STATE_F = os.path.join(AI, 'state.json')
-DST = os.path.join(ROOT, 'public/assets/64/player/mount')
-ICONS = os.path.join(ROOT, 'public/assets/64/ui/icons')
+BASE = Path(__file__).resolve().parent.parent
+AI = BASE / 'public/assets/64/_source/ai_gen'
+STATE_F = AI / 'state.json'
+DST = BASE / 'public/assets/64/player/mount'
+ICONS = BASE / 'public/assets/64/ui/icons'
 API = 'https://api.pixellab.ai/v2'
 
 MOUNTS = {
@@ -30,15 +31,17 @@ MOUNTS = {
 
 def env():
     out = {}
-    for ln in open(os.path.join(ROOT, '.env')):
-        ln = ln.strip()
-        if ln and not ln.startswith('#') and '=' in ln:
-            k, v = ln.split('=', 1)
-            out[k.strip()] = v.strip().strip('"')
+    env_file = BASE / '.env'
+    if env_file.exists():
+        for ln in open(env_file):
+            ln = ln.strip()
+            if ln and not ln.startswith('#') and '=' in ln:
+                k, v = ln.split('=', 1)
+                out[k.strip()] = v.strip().strip('"')
     return out
 
 
-KEYS = dict(p.split(':', 1) for p in env()['PIXELLAB_KEYS'].split(';'))
+KEYS = dict(p.split(':', 1) for p in env()['PIXELLAB_KEYS'].split(';')) if 'PIXELLAB_KEYS' in env() else {}
 
 
 def call(keyname, method, path, body=None, timeout=300):

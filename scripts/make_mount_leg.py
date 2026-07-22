@@ -5,10 +5,12 @@ saindo do quadril p/ frente-baixo, joelho, canela vertical e bota apontando p/ f
 O quadril fica ATRÁS (conecta no corpo), a bota À FRENTE. Vira p/ LESTE; jogo espelha
 p/ oeste. Saída: public/assets/64/player/mount_leg.png (Scale2x 2x)."""
 import os
+from pathlib import Path
 import numpy as np
 from PIL import Image
 
-OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'public/assets/64/player')
+BASE = Path(__file__).resolve().parent.parent
+OUT = BASE / 'public/assets/64/player'
 os.makedirs(OUT, exist_ok=True)
 
 # paleta amostrada do sprite (calça bege + sombra roxa; bota marrom escura)
@@ -76,6 +78,7 @@ def scale2x(img):
 leg2 = scale2x(leg)
 leg2.save(f'{OUT}/mount_leg.png')
 # preview ampliado
-leg2.resize((leg2.width * 6, leg2.height * 6), Image.NEAREST).save(
-    '/tmp/claude-1000/-home-calney-Labfy-gamerpg/05959a59-b521-4885-9897-f924249a1615/scratchpad/leg_drawn.png')
+scratch_dir = BASE / '.ai_raw'
+os.makedirs(scratch_dir, exist_ok=True)
+leg2.resize((leg2.width * 6, leg2.height * 6), Image.NEAREST).save(scratch_dir / 'leg_drawn.png')
 print(f'mount_leg.png: {leg2.size}px (perna desenhada, vira leste)')

@@ -11,11 +11,12 @@ import sys
 import time
 import urllib.request
 import zipfile
+from pathlib import Path
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-AI = os.path.join(ROOT, 'public/assets/64/_source/ai_gen')
-RAW = os.path.join(ROOT, '.ai_raw')  # dumps de debug (gitignored via .ai_raw)
-STATE_F = os.path.join(AI, 'state.json')
+BASE = Path(__file__).resolve().parent.parent
+AI = BASE / 'public/assets/64/_source/ai_gen'
+RAW = BASE / '.ai_raw'  # dumps de debug (gitignored via .ai_raw)
+STATE_F = AI / 'state.json'
 API = 'https://api.pixellab.ai/v2'
 os.makedirs(AI, exist_ok=True)
 os.makedirs(RAW, exist_ok=True)
@@ -23,16 +24,18 @@ os.makedirs(RAW, exist_ok=True)
 
 def env():
     out = {}
-    for ln in open(os.path.join(ROOT, '.env')):
-        ln = ln.strip()
-        if ln and not ln.startswith('#') and '=' in ln:
-            k, v = ln.split('=', 1)
-            out[k.strip()] = v.strip().strip('"')
+    env_file = BASE / '.env'
+    if env_file.exists():
+        for ln in open(env_file):
+            ln = ln.strip()
+            if ln and not ln.startswith('#') and '=' in ln:
+                k, v = ln.split('=', 1)
+                out[k.strip()] = v.strip().strip('"')
     return out
 
 
 E = env()
-KEYS = dict(p.split(':', 1) for p in E['PIXELLAB_KEYS'].split(';'))
+KEYS = dict(p.split(':', 1) for p in E['PIXELLAB_KEYS'].split(';')) if 'PIXELLAB_KEYS' in E else {}
 
 
 def call(keyname, method, path, body=None, timeout=300):
@@ -86,7 +89,7 @@ def save_b64_png(b64, dest):
     data = base64.b64decode(b64)
     assert data[:4] == b'\x89PNG', 'não é PNG'
     open(dest, 'wb').write(data)
-    print('salvo', os.path.relpath(dest, ROOT), len(data), 'bytes')
+    print('salvo', os.path.relpath(dest, BASE), len(data), 'bytes')
 
 
 def poll(fn, label, interval=8, max_s=600):
@@ -158,7 +161,7 @@ def stage_tileset():
     json.dump(d.get('metadata') or {}, open(os.path.join(AI, 'tileset_meta.json'), 'w'), indent=1, default=str)
     # marca concluído (o check de topo usa tileset_raw.png como flag)
     Image.new('RGBA', (1, 1)).save(os.path.join(AI, 'tileset_raw.png'))
-    print(f"tileset ok — {len(ts['tiles'])} tiles em {os.path.relpath(snow_dir, ROOT)}")
+    print(f"tileset ok — {len(ts['tiles'])} tiles em {os.path.relpath(snow_dir, BASE)}")
 
 
 # ---------- TREE (map object) ----------

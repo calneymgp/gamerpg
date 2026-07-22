@@ -15,10 +15,10 @@ from pathlib import Path
 from PIL import Image, ImageFilter
 
 
-ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "assets/ui_codex_src/ui-kit-codex-alpha-full.png"
-HP_SOURCE = ROOT / "assets/ui_codex_src/hp-kit-codex-alpha-full.png"
-OUTPUT = ROOT / "public/assets/64/ui/codex"
+BASE = Path(__file__).resolve().parent.parent
+SOURCE = BASE / "assets/ui_codex_src/ui-kit-codex-alpha-full.png"
+HP_SOURCE = BASE / "assets/ui_codex_src/hp-kit-codex-alpha-full.png"
+OUTPUT = BASE / "public/assets/64/ui/codex"
 SCALE = 4
 HP_SCALE = 5
 PADDING = 2

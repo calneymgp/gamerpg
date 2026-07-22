@@ -7,14 +7,15 @@ import io
 import os
 import urllib.request
 import zipfile
+from pathlib import Path
 
 import numpy as np
 from PIL import Image
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CACHE = os.path.join(ROOT, 'assets/lpc_ride/LPC_ride_0.9.0.zip')
-DST = os.path.join(ROOT, 'public/assets/64/player/mount')
-ICONS = os.path.join(ROOT, 'public/assets/64/ui/icons')
+BASE = Path(__file__).resolve().parent.parent
+CACHE = BASE / 'assets/lpc_ride/LPC_ride_0.9.0.zip'
+DST = BASE / 'public/assets/64/player/mount'
+ICONS = BASE / 'public/assets/64/ui/icons'
 URL = 'https://opengameart.org/sites/default/files/LPC_ride_0.9.0.zip'
 
 # pastas do zip -> cor (identificado por cor média do pelo)
@@ -67,7 +68,7 @@ if not os.path.exists(CACHE):
     req = urllib.request.Request(URL, headers={'User-Agent': 'Mozilla/5.0'})
     with open(CACHE, 'wb') as fh:
         fh.write(urllib.request.urlopen(req).read())
-    print('baixado:', os.path.relpath(CACHE, ROOT))
+    print('baixado:', os.path.relpath(CACHE, BASE))
 
 z = zipfile.ZipFile(CACHE)
 count = 0
@@ -87,7 +88,7 @@ for folder, cor in COLORS.items():
     print(cor, 'ok')
 
 # ícone "a pé": botas do paper doll (frame sul parado do feet)
-feet = Image.open(os.path.join(ROOT, 'public/assets/64/player/equip/feet/walk.png'))
+feet = Image.open(BASE / 'public/assets/64/player/equip/feet/walk.png')
 icon64(feet.convert('RGBA').crop((0, 256, 128, 384))).save(
     os.path.join(ICONS, 'dismount.png'))
 
@@ -103,4 +104,4 @@ g = Image.alpha_composite(
 for c in range(4):
     frame = g.crop((c * 128, 2 * 128, (c + 1) * 128, 3 * 128))
     print('gallop s f%d bbox:' % c, frame.getbbox())
-print(f'{count} sheets -> {os.path.relpath(DST, ROOT)}')
+print(f'{count} sheets -> {os.path.relpath(DST, BASE)}')

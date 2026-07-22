@@ -20,19 +20,22 @@ import json
 import os
 import time
 import urllib.request
+from pathlib import Path
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-AI = os.path.join(ROOT, 'public/assets/64/_source/ai_gen')
-STATE_F = os.path.join(AI, 'state.json')
+BASE = Path(__file__).resolve().parent.parent
+AI = BASE / 'public/assets/64/_source/ai_gen'
+STATE_F = AI / 'state.json'
 API = 'https://api.pixellab.ai/v2'
 
 E = {}
-for ln in open(os.path.join(ROOT, '.env')):
-    ln = ln.strip()
-    if ln and not ln.startswith('#') and '=' in ln:
-        k, v = ln.split('=', 1)
-        E[k.strip()] = v.strip().strip('"')
-KEYS = dict(p.split(':', 1) for p in E['PIXELLAB_KEYS'].split(';'))
+env_file = BASE / '.env'
+if env_file.exists():
+    for ln in open(env_file):
+        ln = ln.strip()
+        if ln and not ln.startswith('#') and '=' in ln:
+            k, v = ln.split('=', 1)
+            E[k.strip()] = v.strip().strip('"')
+KEYS = dict(p.split(':', 1) for p in E.get('PIXELLAB_KEYS', '').split(';')) if 'PIXELLAB_KEYS' in E else {}
 
 
 def call(keyname, method, path, body=None, timeout=300):
@@ -79,7 +82,7 @@ def save_state(s):
 def ref_b64(path, fw, fh, size):
     """Frame 0 do sprite do jogo, centralizado num canvas size×size com pés no chão."""
     from PIL import Image
-    im = Image.open(os.path.join(ROOT, path)).convert('RGBA').crop((0, 0, fw, fh))
+    im = Image.open(BASE / path).convert('RGBA').crop((0, 0, fw, fh))
     canvas = Image.new('RGBA', (size, size), (0, 0, 0, 0))
     canvas.alpha_composite(im, ((size - fw) // 2, size - fh - 4))
     buf = io.BytesIO()
@@ -188,7 +191,7 @@ def main():
     rot = d['rotation_urls']
     idles = [fetch(rot[k]) for k in order]
     S = idles[0].width
-    out_dir = os.path.join(ROOT, 'public/assets/64/player/mount', args.nome)
+    out_dir = BASE / 'public/assets/64/player/mount' / args.nome
     os.makedirs(out_dir, exist_ok=True)
     sheet = Image.new('RGBA', (S, S * 4), (0, 0, 0, 0))
     for i, im in enumerate(idles):
@@ -205,7 +208,7 @@ def main():
 
     # 4) ícone do inventário (idle sul)
     icon = idles[2].crop(idles[2].getbbox()).resize((96, 96), Image.NEAREST)
-    icon.save(os.path.join(ROOT, f'public/assets/64/ui/icons/mount_{args.nome}.png'))
+    icon.save(BASE / f'public/assets/64/ui/icons/mount_{args.nome}.png')
 
     print(f'\n=== {args.nome}: PRONTO (frame {S}px, walk {cols}f) ===')
     print(f'Cole no AI_MOUNTS do game.js (calibre offs/dy/bob visualmente):')
