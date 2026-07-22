@@ -19,6 +19,12 @@ O usuário escolheu o 64×64 — demos 32/128 foram DELETADOS (zips brutos ainda
 Único demo: **`public/demo64/` — Ilha de Elmsong**:
 
 - 3 biomas lado a lado (campo/grama, deserto/areia, pedra/elevation) ligados por pontes.
+- **BURGO** (2026-07-22): ilha de calçamento medieval ao SUL da villa, ponte vertical
+  (`VBRIDGE`, frames 3/6/9 do bridge.png). Tileset `terrain/vila.png` (37 frames 64px):
+  imagem WhatsApp 6×6 fundo magenta → `scripts/build_vila_tiles.py` (chroma key c/
+  tolerância JPEG, inset 2px, halo 1px, downscale premult., frame 36 = grama sintetizada).
+  Pintura em `paintVila()`: mureta na borda, saia frame 13 (conteúdo na linha 44 → offset
+  −44px), praça de tijolo, parque de grama, decalques 24-29 (fundo de pedra opaco).
 - 15 NPCs rotulados: 12 monstros Pixel Adventure (CC0) + 2 goblins Tiny Swords + ovelhas.
 - **Paper doll LPC**: personagem em camadas (weapon_behind → body → feet → legs → torso →
   head → weapon), 5 armas + 5 armaduras trocáveis via inventário DOM (🎒 / tecla I),

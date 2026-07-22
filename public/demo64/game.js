@@ -1,7 +1,7 @@
 /* Ilha de Elmsong 2.0 — 3 biomas, 15 monstros (CC0), paper doll LPC com inventário */
 (function () {
   const { FreeWalker, HomeWanderer, Joystick, ActionButton, keyboardVec, makeKeys } = RPGLab;
-  const TILE = 64, WORLD_W = 55, WORLD_H = 15, WORLD_X0 = -25;
+  const TILE = 64, WORLD_W = 55, WORLD_H = 27, WORLD_X0 = -25;
 
   // --- mundo: 6 ilhas + pontes (castelo e villa em x negativo, à esquerda do campo) ---
   const ISLES = {
@@ -11,8 +11,11 @@
     deserto: { x: 15, y: 3, w: 10, h: 9, base: 5, titulo: 'DESERTO' },
     pedra: { x: 28, y: 3, w: 10, h: 9, base: null, titulo: 'PEDRA' },
     neve: { x: 41, y: 3, w: 10, h: 9, base: null, titulo: 'NEVE ✦ IA' },
+    burgo: { x: -11, y: 15, w: 10, h: 9, base: null, titulo: 'BURGO' },
   };
   const BRIDGES = [[-14, 7], [-13, 7], [-12, 7], [-1, 7], [0, 7], [1, 7], [12, 7], [13, 7], [14, 7], [25, 7], [26, 7], [27, 7], [38, 7], [39, 7], [40, 7]];
+  // ponte vertical villa → burgo (frames 3/6/9 do bridge.png = topo/meio/base)
+  const VBRIDGE = [[-6, 12], [-6, 13], [-6, 14]];
   // casa gerada por IA (ChatGPT) — 8×7.8 tiles, centrada no castelo. footprint bloqueado.
   const AI_HOUSE = { cx: -19, by: 12, cells: [] };
   for (let dx = -3; dx <= 3; dx++) for (let dy = 0; dy <= 3; dy++) AI_HOUSE.cells.push([-19 + dx, 11 - dy]);
@@ -23,7 +26,8 @@
   const inRect = (r, tx, ty) => tx >= r.x && tx < r.x + r.w && ty >= r.y && ty < r.y + r.h;
   const onLand = (tx, ty) =>
     Object.values(ISLES).some(r => inRect(r, tx, ty)) ||
-    BRIDGES.some(([bx, by]) => bx === tx && by === ty);
+    BRIDGES.some(([bx, by]) => bx === tx && by === ty) ||
+    VBRIDGE.some(([bx, by]) => bx === tx && by === ty);
   // construções Tiny Swords Update 010 (CC0) — 64px nativo, escala 1:1 com o tile.
   //   [tex, ax, ay, wt, ht, frames]: (ax,ay) = canto inf-esq em tiles; a arte sobe ht tiles.
   const BUILDINGS = [
@@ -121,6 +125,7 @@
     this.load.spritesheet('elev', A + 'terrain/pedra.png', { frameWidth: 64, frameHeight: 64 });
     this.load.spritesheet('snowflat', A + 'terrain/neve.png', { frameWidth: 64, frameHeight: 64 });
     this.load.spritesheet('bridge', A + 'terrain/bridge.png', { frameWidth: 64, frameHeight: 64 });
+    this.load.spritesheet('vila', A + 'terrain/vila.png', { frameWidth: 64, frameHeight: 64 });
     this.load.spritesheet('foam', A + 'terrain/foam.png', { frameWidth: 192, frameHeight: 192 });
     this.load.spritesheet('rocks1', A + 'terrain/rocks_01.png', { frameWidth: 64, frameHeight: 64 });
     // --- props/ (árvores + decoração, por bioma) ---
@@ -173,6 +178,7 @@
     this.load.spritesheet('aihero-idle', A + 'player/hero_ia/idle.png', { frameWidth: 92, frameHeight: 92 });
     this.load.spritesheet('aihero-walk', A + 'player/hero_ia/walk.png', { frameWidth: 92, frameHeight: 92 });
     this.load.image('mount-leg', A + 'player/mount_leg.png'); // pezinho do lado de cá (montado)
+    this.load.spritesheet('evil_spirit', A + 'effects/evil_spirit_sheet.png', { frameWidth: 192, frameHeight: 192 });
   }
 
   function paintRect(scene, rect, base, depth, tex = 'flat') {
@@ -201,6 +207,38 @@
         .setOrigin(0).setDepth(depth);
     }
   }
+  // BURGO: calçamento medieval (vila.png, tileset WhatsApp tratado via chroma key).
+  // Piso de pedra variado, mureta na borda (12/14/15 + cantos 16/17/18/22), saia
+  // frame 13 sobre a água, praça de tijolo (6-9, transições 10/11), parque de
+  // grama (30-35 + miolo do 'flat') e decalques urbanos (24-29).
+  function paintVila(scene, rect, depth) {
+    const rng = new Phaser.Math.RandomDataGenerator(['burgo']);
+    const FLOOR = [0, 0, 0, 1, 1, 1, 2, 3, 4, 5];
+    const put = (lx, ly, f, tex = 'vila') =>
+      scene.add.image((rect.x + lx) * TILE, (rect.y + ly) * TILE, tex, f).setOrigin(0).setDepth(depth);
+    for (let y = 0; y < rect.h; y++) for (let x = 0; x < rect.w; x++) {
+      let f = rng.pick(FLOOR);
+      if (y === 0) f = x === 0 ? 16 : (x === rect.w - 1 ? 17 : 12);
+      else if (x === 0) f = y === rect.h - 1 ? 18 : 14;
+      else if (x === rect.w - 1) f = y === rect.h - 1 ? 22 : 15;
+      put(x, y, f);
+    }
+    put(VBRIDGE[0][0] - rect.x, 0, rng.pick([0, 1])); // abre a mureta na entrada da ponte
+    // saia da plataforma: conteúdo do frame 13 começa na linha 44 — sobe 44px p/ colar na ilha
+    for (let x = 0; x < rect.w; x++)
+      scene.add.image((rect.x + x) * TILE, (rect.y + rect.h) * TILE - 44, 'vila', 13)
+        .setOrigin(0).setDepth(depth);
+    // praça de tijolo com transição p/ pedra nas laterais
+    for (let y = 2; y <= 4; y++) for (let x = 2; x <= 5; x++)
+      put(x, y, x === 2 ? 11 : (x === 5 ? 10 : rng.pick([6, 6, 7, 8, 9])));
+    // parque de grama no canto SE (curvas 34/35, retas 30-33, miolo grama do campo)
+    put(5, 6, 34); put(6, 6, 30); put(7, 6, 31); put(8, 6, 35);
+    put(5, 7, 32); put(5, 8, 32); put(8, 7, 33); put(8, 8, 33);
+    for (let y = 7; y <= 8; y++) for (let x = 6; x <= 7; x++) put(x, y, 36); // grama pura sintetizada
+    // decalques (tiles com fundo de pedra — só sobre área de pedra)
+    [[2, 6, 24], [7, 2, 28], [4, 5, 29], [8, 4, 25], [1, 7, 25], [3, 6, 26], [1, 2, 27]]
+      .forEach(([x, y, f]) => put(x, y, f));
+  }
   function foamRing(scene, rect) {
     for (let y = 0; y < rect.h; y++) for (let x = 0; x < rect.w; x++) {
       if (y === 0 || x === 0 || y === rect.h - 1 || x === rect.w - 1) {
@@ -224,6 +262,7 @@
     paintRect(this, ISLES.deserto, 5, -80);
     paintStone(this, ISLES.pedra, -80);
     paintRect(this, ISLES.neve, 0, -80, 'snowflat');
+    paintVila(this, ISLES.burgo, -80);
 
     // casa gerada por IA no bioma CASTELO (sombra no chão + sprite com depth pela base)
     {
@@ -237,6 +276,8 @@
       const seg = i % 3 === 0 ? 0 : (i % 3 === 2 ? 2 : 1);
       this.add.image(x * TILE, y * TILE, 'bridge', seg).setOrigin(0).setDepth(-85);
     });
+    VBRIDGE.forEach(([x, y], i) =>
+      this.add.image(x * TILE, y * TILE, 'bridge', [3, 6, 9][i]).setOrigin(0).setDepth(-85));
 
     // títulos dos biomas
     for (const r of Object.values(ISLES)) {
@@ -706,7 +747,218 @@
       this.flashDoll();
       this.setHp(this.P.hp - 3); // dano do golpe do bicho
     };
+
+    initEvilSpirits(this);
     window.__scene = this;
+  }
+
+  // --- sistema Evil Spirits (MU Online) — 50 vultos caóticos ---
+  const EVIL_SPIRIT_COUNT = 50;
+  const EVIL_SPIRIT_RADIUS = 280;
+
+  function initEvilSpirits(scene) {
+    if (!scene.anims.exists('evil-spirit-float')) {
+      scene.anims.create({
+        key: 'evil-spirit-float',
+        frameRate: 9,
+        repeat: -1,
+        frames: scene.anims.generateFrameNumbers('evil_spirit', { start: 0, end: 3 })
+      });
+    }
+
+    scene.evilMode = 1;
+    scene.evilSpirits = [];
+
+    for (let i = 0; i < EVIL_SPIRIT_COUNT; i++) {
+      const spr = scene.add.sprite(0, 0, 'evil_spirit', 0)
+        .setOrigin(0.5, 0.5)
+        .setAlpha(0.55)
+        .setVisible(true)
+        .play('evil-spirit-float');
+
+      const angle = (i / EVIL_SPIRIT_COUNT) * Math.PI * 2;
+      const r = 40 + Math.random() * 240;
+      spr.setPosition(
+        scene.player.x + Math.cos(angle) * r,
+        scene.player.y - 12 + Math.sin(angle) * r * 0.7
+      );
+
+      scene.evilSpirits.push({
+        spr,
+        vx: 0, vy: 0,
+        orbitAngle: angle,
+        orbitR: r,
+        baseRadius: r,                         // raio âncora — orbita ao redor dele
+        orbitSpeed: 1.2 + Math.random() * 2.8,
+        ellipseRatio: 0.5 + Math.random() * 0.4, // achatamento da órbita (0.5=elipse, 1.0=círculo)
+        wobble: Math.random() * Math.PI * 2,
+        chaseTarget: null,
+        chaseTimer: 0,
+        pulse: Math.random() * Math.PI * 2,
+        pulseSpeed: 2.5 + Math.random() * 4,
+      });
+    }
+
+    window.__evilMode = scene.evilMode;
+    window.__setEvilMode = (m) => {
+      scene.evilMode = m;
+      window.__evilMode = m;
+      scene.evilSpirits.forEach(es => { es.spr.setVisible(m > 0); });
+      document.querySelectorAll('.evil-btn').forEach(btn => btn.classList.remove('active'));
+      const activeBtn = document.getElementById('btnEvil' + m);
+      if (activeBtn) activeBtn.classList.add('active');
+    };
+  }
+
+  function updateEvilSpirits(scene, time, delta) {
+    const mode = scene.evilMode;
+    if (!mode || mode === 0) return;
+    const px = scene.player.x;
+    const py = scene.player.y - 12;
+    const dt = delta / 1000;
+    const tSec = time / 1000;
+
+    scene.evilSpirits.forEach((es, i) => {
+      let sx = es.spr.x, sy = es.spr.y;
+      es.pulse += es.pulseSpeed * dt;
+      const alphaBase = 0.35 + Math.sin(es.pulse) * 0.15;
+      let targetScale = 0.55;
+
+      if (mode === 1) {
+        // ---- NUVEM SOMBRIA: movimento browniano caótico, atraído suavemente ao centro ----
+        // cada espírito tem sua própria velocidade que muda gradualmente de forma aleatória
+        const dx = sx - px;
+        const dy = sy - py;
+        const dist = Math.hypot(dx, dy);
+
+        // aceleração browniana: direção muda a cada poucos frames
+        if (Math.random() < 0.04) {
+          es.vx += (Math.random() - 0.5) * 120;
+          es.vy += (Math.random() - 0.5) * 120;
+        }
+        // fricção leve
+        es.vx *= 0.985;
+        es.vy *= 0.985;
+        // limite de velocidade
+        const vMag = Math.hypot(es.vx, es.vy);
+        if (vMag > 160) { es.vx *= 160 / vMag; es.vy *= 160 / vMag; }
+
+        // atração suave ao player quando muito longe, repulsão suave quando muito perto
+        if (dist > 0.1) {
+          const pull = dist > EVIL_SPIRIT_RADIUS ? 0.6 + (dist - EVIL_SPIRIT_RADIUS) * 0.002
+                    : dist < 50 ? -0.3
+                    : 0.15;
+          es.vx -= (dx / dist) * pull * 80 * dt;
+          es.vy -= (dy / dist) * pull * 80 * dt;
+        }
+
+        sx += es.vx * dt;
+        sy += es.vy * dt;
+
+        // confina ao raio (elastic boundary)
+        const newDx = sx - px, newDy = sy - py;
+        if (Math.hypot(newDx, newDy) > EVIL_SPIRIT_RADIUS + 20) {
+          es.vx -= (newDx - px) * 0.05;
+          es.vy -= (newDy - py) * 0.05;
+        }
+
+        targetScale = 0.45 + Math.abs(Math.sin(es.pulse)) * 0.2;
+        es.spr.setFlipX(es.vx < 0);
+
+      } else if (mode === 2) {
+        // ---- ENXAME CAÓTICO: órbitas circulares com raios variados (perto/longe/aleatório) ----
+        // ângulo avança com pequena variação de velocidade p/ não ficar robótico
+        const speedVar = 1 + Math.sin(tSec * 1.3 + es.wobble) * 0.25;
+        es.orbitAngle += es.orbitSpeed * speedVar * dt;
+
+        // raio oscila SUAVEMENTE ao redor do baseRadius (sem fugir muito)
+        const radiusWobble = Math.sin(tSec * 1.7 + es.wobble * 1.3) * 18;
+        const curR = Phaser.Math.Clamp(es.baseRadius + radiusWobble, 25, EVIL_SPIRIT_RADIUS);
+
+        // inversão de direção OCASIONAL (rara, p/ surpresa)
+        if (Math.random() < 0.006) es.orbitSpeed *= -1;
+
+        // órbita elíptica: raio horizontal = curR, vertical = curR * ellipseRatio
+        // dá variedade visual (uns circulam mais "achatados" que outros)
+        const rx = curR;
+        const ry = curR * es.ellipseRatio;
+
+        // leve perturbação caótica sobre a posição orbital (só uns pixels)
+        const chaosX = Math.sin(tSec * 5.5 + i) * 10;
+        const chaosY = Math.cos(tSec * 5.5 + i * 0.7) * 10;
+
+        sx = px + Math.cos(es.orbitAngle) * rx + chaosX;
+        sy = py + Math.sin(es.orbitAngle) * ry + chaosY;
+
+        targetScale = 0.42 + Math.abs(Math.cos(es.orbitAngle * 2)) * 0.18;
+        es.spr.setFlipX(Math.cos(es.orbitAngle) < 0);
+
+      } else if (mode === 3) {
+        // ---- MIASMA CAÇADOR: movimento browniano + perseguição agressiva a inimigos ----
+        // drift browniano base
+        if (Math.random() < 0.03) {
+          es.vx += (Math.random() - 0.5) * 100;
+          es.vy += (Math.random() - 0.5) * 100;
+        }
+        es.vx *= 0.98;
+        es.vy *= 0.98;
+        const vM = Math.hypot(es.vx, es.vy);
+        if (vM > 200) { es.vx *= 200 / vM; es.vy *= 200 / vM; }
+
+        // procura monstro mais próximo
+        let nearest = null, minD = 260;
+        for (const f of scene.foes) {
+          const d = Math.hypot(f.walker.x - sx, f.walker.y - sy);
+          if (d < minD) { minD = d; nearest = f; }
+        }
+
+        if (nearest && minD < 260) {
+          // atraído agressivamente ao monstro
+          const tx = nearest.walker.x, ty = nearest.walker.y - 12;
+          const tdx = tx - sx, tdy = ty - sy;
+          const td = Math.hypot(tdx, tdy) || 1;
+          const chaseForce = 300 + (1 - minD / 260) * 500;
+          es.vx += (tdx / td) * chaseForce * dt;
+          es.vy += (tdy / td) * chaseForce * dt;
+
+          // flash roxo no monstro ao colidir
+          if (minD < 40 && time - (nearest.lastEvilHit || 0) > 400) {
+            nearest.lastEvilHit = time;
+            nearest.spr.setTint(0x9a4dff);
+            scene.time.delayedCall(130, () => nearest.spr.clearTint());
+          }
+
+          targetScale = 0.55 + (1 - minD / 260) * 0.3;
+        } else {
+          // atração fraca ao player quando sem alvo
+          const pdx = px - sx, pdy = py - sy;
+          const pd = Math.hypot(pdx, pdy) || 1;
+          es.vx += (pdx / pd) * 40 * dt;
+          es.vy += (pdy / pd) * 40 * dt;
+          targetScale = 0.4;
+        }
+
+        sx += es.vx * dt;
+        sy += es.vy * dt;
+
+        // confina ao raio
+        const cdx = sx - px, cdy = sy - py;
+        const cd = Math.hypot(cdx, cdy);
+        if (cd > EVIL_SPIRIT_RADIUS) {
+          sx = px + (cdx / cd) * EVIL_SPIRIT_RADIUS;
+          sy = py + (cdy / cd) * EVIL_SPIRIT_RADIUS;
+          es.vx *= -0.3;
+          es.vy *= -0.3;
+        }
+
+        es.spr.setFlipX(nearest ? nearest.walker.x < sx : es.vx < 0);
+      }
+
+      es.spr.setPosition(sx, sy);
+      es.spr.setAlpha(alphaBase);
+      es.spr.setScale(targetScale);
+      es.spr.setDepth(sy + 10);
+    });
   }
 
   function update(time, delta) {
@@ -732,6 +984,7 @@
     }
     this.player.update(keyboardVec(this.keys) || this.joy.vec, delta);
     this.mobs.forEach(m => m.update(delta));
+    updateEvilSpirits(this, time, delta);
   }
 
   // espera a fonte pixel antes de subir o jogo (nomes usam Pixelify Sans)

@@ -105,6 +105,28 @@
 .slot span { display: none; }
 @media (max-width: 640px) { #inv { width: 262px; } }
 
+/* ============ Evil Spirit (MU Online) Controller UI ============ */
+#evilSpiritBar {
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 30;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center;
+  background: rgba(14, 12, 24, 0.92); border: 2px solid #7c4dff; border-radius: 12px;
+  padding: 6px 14px; box-shadow: 0 4px 18px rgba(124, 77, 255, 0.45);
+  font-family: 'Pixelify Sans', sans-serif; backdrop-filter: blur(4px);
+}
+#evilSpiritBar .title {
+  display: flex; align-items: center; gap: 6px; color: #e1bee7; font-weight: bold; font-size: 14px; margin-right: 4px;
+}
+#evilSpiritBar .title img { width: 22px; height: 22px; image-rendering: pixelated; }
+.evil-btn {
+  background: #1f1a3a; color: #d1c4e9; border: 1px solid #512da8; border-radius: 6px;
+  padding: 5px 12px; font-family: inherit; font-size: 13px; font-weight: bold; cursor: pointer;
+  transition: all 0.15s ease; outline: none;
+}
+.evil-btn:hover { background: #311b92; color: #fff; border-color: #7c4dff; transform: translateY(-1px); }
+.evil-btn.active { background: #651fff; color: #ffffff; border-color: #b388ff; box-shadow: 0 0 12px rgba(179, 136, 255, 0.7); }
+.evil-btn.off { background: #2a1520; color: #ff8a80; border-color: #c62828; }
+.evil-btn.off.active { background: #d50000; color: #fff; box-shadow: 0 0 10px rgba(213, 0, 0, 0.6); }
+
 /* ============ A.I.U.I.Codex — segunda UI, paralela ao HUD atual ============ */
 #codexHud {
   --codex-gold: #e5b553;
@@ -243,10 +265,36 @@
     </div>
   </div>
 </div>
+
+<!-- Barra de Controle Evil Spirits (MU Online) -->
+<div id="evilSpiritBar">
+  <div class="title">
+    <img src="../assets/64/ui/evil_spirit_icon.png" alt="Evil Spirit Icon">
+    <span>Evil Spirits (MU):</span>
+  </div>
+  <button id="btnEvil1" class="evil-btn active" onclick="window.__setEvilMode && window.__setEvilMode(1)" title="Tecla 1">1. Nuvem Sombria</button>
+  <button id="btnEvil2" class="evil-btn" onclick="window.__setEvilMode && window.__setEvilMode(2)" title="Tecla 2">2. Enxame Caótico</button>
+  <button id="btnEvil3" class="evil-btn" onclick="window.__setEvilMode && window.__setEvilMode(3)" title="Tecla 3">3. Miasma Caçador</button>
+  <button id="btnEvil0" class="evil-btn off" onclick="window.__setEvilMode && window.__setEvilMode(0)" title="Alternar (Tecla E)">Off</button>
+</div>
+
 <div id="game"></div>
 <script src="../vendor/react.production.min.js"></script>
 <script src="../vendor/react-dom.production.min.js"></script>
 <script>
+// Atalhos de teclado para Evil Spirit (1, 2, 3 e E)
+addEventListener('keydown', e => {
+  if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+  if (e.key === '1') window.__setEvilMode && window.__setEvilMode(1);
+  if (e.key === '2') window.__setEvilMode && window.__setEvilMode(2);
+  if (e.key === '3') window.__setEvilMode && window.__setEvilMode(3);
+  if (e.key === 'e' || e.key === 'E') {
+    const current = window.__evilMode || 1;
+    const nextMode = current >= 3 ? 0 : current + 1;
+    window.__setEvilMode && window.__setEvilMode(nextMode);
+  }
+});
+
 // HUD Pergaminho em React puro. Texto é PIXELADO DE VERDADE:
 // renderiza a fonte num canvas pequeno (Press Start 2P 8px), binariza o alpha p/ matar
 // o antialias e faz upscale nearest — vira pixel chunky como os sprites do jogo.
@@ -469,6 +517,6 @@ addEventListener('keydown', e => {
   sync();
 })();
 </script>
-<script src="game.js?v=perninha6"></script>
+<script src="game.js?v=ghost3"></script>
 </body>
 </html>

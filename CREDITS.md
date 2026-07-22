@@ -55,6 +55,12 @@ Este repositório usa apenas assets gratuitos de terceiros. Downloads brutos em 
   Tiny Swords (CC0); o tileset 100% IA fica preservado em `ai/snow/`.
   Pipeline: `scripts/gen_neve.py` + roteador de chaves `scripts/pixellab-route.py`.
 
+### Bioma BURGO — tileset de calçamento
+- **Calçamento medieval da vila (`terrain/vila.png`)** — imagem fornecida pelo usuário
+  via WhatsApp (2026-07-22), aparência de asset gerado por IA; origem/licença a
+  confirmar. Original em `assets/vila_calcamento/`; tratamento (chroma key magenta,
+  fatiamento 6×6, downscale 64px, grama sintetizada) em `scripts/build_vila_tiles.py`.
+
 ## Engine
 - **Phaser 4.2.1** — MIT — https://phaser.io (vendorizado em `public/vendor/phaser.min.js`)
 
